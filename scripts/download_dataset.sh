@@ -8,12 +8,21 @@ if [[ "${1:-}" != "" && "${1:-}" != "--extract" ]]; then
   exit 2
 fi
 
-for cmd in curl shasum awk zstd tar; do
+for cmd in curl awk zstd tar; do
   if ! command -v "$cmd" >/dev/null 2>&1; then
-    echo "Falta $cmd. Instala zstd con: brew install zstd (macOS)" >&2
+    echo "Falta $cmd. Instala las dependencias del README (Linux/macOS)." >&2
     exit 1
   fi
 done
+
+if command -v sha256sum >/dev/null 2>&1; then
+  SHA256_COMMAND=(sha256sum)
+elif command -v shasum >/dev/null 2>&1; then
+  SHA256_COMMAND=(shasum -a 256)
+else
+  echo "Falta sha256sum (Linux) o shasum (macOS)." >&2
+  exit 1
+fi
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 RAW="$ROOT/data/raw"
@@ -37,7 +46,7 @@ if [[ ! "$EXPECTED" =~ ^[[:xdigit:]]{64}$ ]]; then
 fi
 
 if [[ -f "$ARCHIVE" ]]; then
-  ACTUAL="$(shasum -a 256 "$ARCHIVE" | awk '{print $1}')"
+  ACTUAL="$("${SHA256_COMMAND[@]}" "$ARCHIVE" | awk '{print $1}')"
 else
   ACTUAL=""
 fi
@@ -47,7 +56,7 @@ if [[ "$ACTUAL" == "$EXPECTED" ]]; then
 else
   echo "Descargando archivo oficial (~238 MB)..."
   curl -fL --retry 3 -C - -o "$ARCHIVE" "$URL"
-  ACTUAL="$(shasum -a 256 "$ARCHIVE" | awk '{print $1}')"
+  ACTUAL="$("${SHA256_COMMAND[@]}" "$ARCHIVE" | awk '{print $1}')"
   if [[ "$ACTUAL" != "$EXPECTED" ]]; then
     echo "ERROR: SHA-256 distinto. No extraer; revisa la descarga." >&2
     exit 1

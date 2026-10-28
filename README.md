@@ -26,7 +26,13 @@ python3 scripts/validate_dataset.py
 
 El script descarga el archivo oficial, comprueba su **SHA-256**, extrae el JSONL y lo deja en `data/processed/listens_full.jsonl`. La validación revisa los **4 855 809** registros esperados sin cargar todo el archivo en memoria.
 
-**Si ya descargaste el dataset:** puedes copiar tu `listens_full.jsonl` a `data/processed/` y ejecutar únicamente el validador.
+**Si ya descargaste el dataset:** puedes copiarlo a `data/processed/` y ejecutar únicamente el validador. Si lo tienes en `~/dev/music-dna/` y prefieres **no duplicar 2,6 GB**, crea un enlace simbólico:
+
+```bash
+mkdir -p data/processed
+ln -s "$HOME/dev/music-dna/data/processed/listens_full.jsonl" data/processed/listens_full.jsonl
+python3 scripts/validate_dataset.py
+```
 
 ## Documentación del equipo
 

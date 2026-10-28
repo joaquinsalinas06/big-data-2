@@ -1,0 +1,19 @@
+# Dataset: no versionar archivos grandes ni datos de usuarios
+data/raw/
+data/processed/
+*.jsonl
+*.listens
+*.tar.zst
+*.zst
+*.part
+*.sha256
+
+# Python y sistema
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.env
+.env.*
+!.env.example
+.DS_Store

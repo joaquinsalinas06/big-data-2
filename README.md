@@ -2,31 +2,99 @@
 
 **Proyecto Grupal II · Big Data** · Entrega: **17 de noviembre de 2026**
 
-**Music DNA** es una propuesta académica para explorar hábitos de escucha y comunidades musicales a partir de datos públicos de [ListenBrainz](https://listenbrainz.org/data/). Esta primera versión del repositorio contiene **solo el dataset, instrucciones de descarga, inspección y validación**. El resto del proyecto será desarrollado posteriormente por el equipo.
+**Music DNA** es una propuesta académica para explorar hábitos de escucha y comunidades musicales a partir de datos públicos de [ListenBrainz](https://listenbrainz.org/data/). Por ahora el repositorio contiene **el dataset, instrucciones de descarga y validación**, sin desarrollar todavía las bases de datos ni el dashboard.
 
 ## Dataset de referencia
 
-- **Fuente:** ListenBrainz / MetaBrainz (datos públicos de escuchas).
-- **Corte utilizado:** incremental del **27 de octubre de 2026**, secuencia **2746**.
-- **Datos observados en la validación local inicial:** **4 855 809** registros JSON Lines; **238 MB comprimido** y **aprox. 2,6 GB extraído**.
-- **Campos principales observados:** `user_id`, `user_name`, `timestamp`, `track_metadata` (con `track_name` y `artist_name`), `recording_msid`; algunos metadatos son opcionales.
-- **Importante:** esto es **un incremental** (ingestas recientes), *no* el histórico completo ni una muestra representativa de escuchas realizadas en octubre: las fechas de escucha observadas van de 2005 a 2026.
+- **Fuente:** ListenBrainz / MetaBrainz (registros públicos de escuchas).
+- **Archivo de referencia:** incremental del **27 de octubre de 2026**, secuencia **2746**.
+- **Datos observados en la validación local:** **4 855 809** registros JSON Lines; **238 MB comprimido** y **aprox. 2,6 GB extraído**.
+- **Campos principales:** `user_id`, `user_name`, `timestamp` y `track_metadata` (incluye `track_name` y `artist_name`). `recording_msid` y otros metadatos pueden ser opcionales.
+- **Importante:** es un **incremental**, no el histórico completo de ListenBrainz. Contiene escuchas fechadas entre 2005 y 2026, incorporadas al sistema en este lote.
 
-## Inicio rápido en macOS
+## Instalación y descarga por sistema operativo
 
-Necesitas Python 3, `curl`, `tar`, `shasum` y `zstd`. Instala este último si no lo tienes:
+En todos los sistemas se descarga el **mismo archivo oficial**, se comprueba el **SHA-256** y se obtiene `data/processed/listens_full.jsonl`. Reserva al menos **4 GB de espacio libre**, además de Git y Python; el espacio exacto necesario puede variar.
 
-```bash
-brew install zstd
+### 1. Windows — PowerShell (sin WSL)
+
+**Recomendado para los compañeros que usan Windows 10/11.** Abre **PowerShell** o Windows Terminal (no CMD). Instala [Git](https://git-scm.com/install/windows) y **Python 3.14** con WinGet:
+
+```powershell
+winget install --id Git.Git -e --source winget
+winget install --id Python.Python.3.14 -e --source winget
+```
+
+Cierra y vuelve a abrir PowerShell para que reconozca los programas. Comprueba:
+
+```powershell
+git --version
+python --version
+```
+
+**Descargar y validar** desde PowerShell:
+
+```powershell
 git clone https://github.com/joaquinsalinas06/big-data-2.git
 cd big-data-2
+
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\download_dataset.ps1 -Extract
+python .\scripts\validate_dataset.py
+```
+
+- `download_dataset.ps1` usa `curl.exe` y `Get-FileHash` para verificar la descarga, y Python **3.14+** para extraer `.tar.zst` sin instalar `zstd` ni WSL.
+- Si Windows muestra «`python` no se reconoce», reinicia la terminal y revisa la instalación/alias de Python.
+- El script comprueba SHA-256 **antes** de extraer y **no sobrescribe** un JSONL ya existente.
+- **Estado de pruebas:** las instrucciones están basadas en las herramientas oficiales, pero aún **no se han probado en una computadora Windows** del grupo.
+
+### 2. Linux — Ubuntu / Debian
+
+Instala las dependencias en la terminal. En otras distribuciones utiliza el gestor de paquetes correspondiente:
+
+```bash
+sudo apt update
+sudo apt install -y git curl zstd python3 tar coreutils
+
+git clone https://github.com/joaquinsalinas06/big-data-2.git
+cd big-data-2
+
 bash scripts/download_dataset.sh --extract
 python3 scripts/validate_dataset.py
 ```
 
-El script descarga el archivo oficial, comprueba su **SHA-256**, extrae el JSONL y lo deja en `data/processed/listens_full.jsonl`. La validación revisa los **4 855 809** registros esperados sin cargar todo el archivo en memoria.
+El script Bash usa `sha256sum` de Linux (o `shasum` como alternativa), lee el comprimido por streaming y guarda el JSONL sin cargar todo el dataset en RAM. **No se ha probado todavía en una máquina Linux del grupo.**
 
-**Si ya descargaste el dataset:** puedes copiarlo a `data/processed/` y ejecutar únicamente el validador. Si lo tienes en `~/dev/music-dna/` y prefieres **no duplicar 2,6 GB**, crea un enlace simbólico:
+### 3. macOS — Terminal
+
+Instala [Homebrew](https://brew.sh/) si aún no lo tienes. Luego:
+
+```bash
+brew install zstd
+
+git clone https://github.com/joaquinsalinas06/big-data-2.git
+cd big-data-2
+
+bash scripts/download_dataset.sh --extract
+python3 scripts/validate_dataset.py
+```
+
+Se requiere Git y Python 3. Si falta alguno, puedes instalarlo con Homebrew: `brew install git python`. **La descarga y extracción de este dump ya se verificaron en macOS**; el script versionado automatiza los mismos pasos.
+
+### Resultado esperado
+
+Al finalizar, el validador debe mostrar aproximadamente:
+
+```text
+=== VALIDACIÓN LISTENBRAINZ ===
+Registros leídos: 4,855,809
+Registros válidos: 4,855,809
+Registros inválidos: 0
+OK: dataset validado
+```
+
+El archivo aparecerá en `data/processed/listens_full.jsonl`. Si falla el checksum, **no utilices el archivo**: vuelve a descargarlo. Si falta espacio, libera al menos unos gigabytes antes de extraer.
+
+**Si ya descargaste el dataset en tu Mac:** evita duplicar los 2,6 GB. Desde la raíz del repositorio:
 
 ```bash
 mkdir -p data/processed
@@ -38,10 +106,11 @@ python3 scripts/validate_dataset.py
 
 | Documento | Para qué sirve |
 | --- | --- |
-| [Dataset y esquema](docs/dataset.md) | Origen, contenido, formato, tamaño, campos y limitaciones |
-| [Descarga y almacenamiento en GCP](docs/gcp.md) | Cómo guardar una sola copia comprimida en un bucket privado, sin descargarla a las laptops |
-| [Script de descarga](scripts/download_dataset.sh) | Descarga, verificación SHA-256 y extracción local |
-| [Script de validación](scripts/validate_dataset.py) | Conteo y comprobación de registros JSON |
+| [Dataset y esquema](docs/dataset.md) | Origen, estructura JSON, tipos de descarga y limitaciones |
+| [Descarga y almacenamiento en GCP](docs/gcp.md) | Alternativa para guardar el comprimido en un bucket privado compartido |
+| [Descarga en Windows](scripts/download_dataset.ps1) | PowerShell: descarga, SHA-256 y extracción |
+| [Descarga en Linux/macOS](scripts/download_dataset.sh) | Bash: descarga, SHA-256 y extracción |
+| [Validador común](scripts/validate_dataset.py) | Comprobación de los registros JSON con Python |
 
 ## Organización inicial
 
@@ -53,17 +122,19 @@ big-data-2/
 │   ├── dataset.md
 │   └── gcp.md
 ├── scripts/
+│   ├── download_dataset.ps1
 │   ├── download_dataset.sh
 │   └── validate_dataset.py
-└── data/                 # Se crea al descargar; NO se sube a Git
+└── data/                  # Se crea al descargar; NO se sube a Git
     ├── raw/
     └── processed/
 ```
 
-Los datos brutos no se versionan: cada integrante puede recuperarlos desde la fuente o, cuando el equipo habilite GCP, desde un bucket compartido y privado. **Todavía no se ha creado ningún bucket ni se han desplegado recursos en Google Cloud.**
+Los datos brutos no se versionan: cada integrante puede recuperarlos desde ListenBrainz o, cuando el equipo lo habilite, desde **Google Cloud Storage**. **Todavía no se ha creado ningún bucket ni desplegado recursos en GCP.** Ver [guía de GCP](docs/gcp.md).
 
 ### Fuentes
 
-- [Descargas de ListenBrainz](https://listenbrainz.org/data/)
-- [Documentación de dumps](https://listenbrainz.readthedocs.io/en/latest/users/listenbrainz-dumps.html)
+- [Descargas oficiales de ListenBrainz](https://listenbrainz.org/data/)
+- [Documentación del dataset](https://listenbrainz.readthedocs.io/en/latest/users/listenbrainz-dumps.html)
 - [Directorio de incrementales](https://data.metabrainz.org/pub/musicbrainz/listenbrainz/incremental/)
+- [Python 3.14 — soporte Zstandard en tarfile](https://docs.python.org/3.14/library/tarfile.html)

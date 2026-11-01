@@ -1,0 +1,22 @@
+# Cassandra de un solo nodo para desarrollo local.
+# Uso (desde la raíz del repo): docker compose -f cassandra_db/docker-compose.yml up -d
+services:
+  cassandra:
+    image: cassandra:5.0
+    container_name: music-dna-cassandra
+    ports:
+      - "9042:9042"
+    environment:
+      CASSANDRA_CLUSTER_NAME: music-dna
+      MAX_HEAP_SIZE: 2G
+      HEAP_NEWSIZE: 400M
+    volumes:
+      - cassandra_data:/var/lib/cassandra
+    healthcheck:
+      test: ["CMD", "cqlsh", "-e", "DESCRIBE KEYSPACES"]
+      interval: 15s
+      timeout: 10s
+      retries: 20
+
+volumes:
+  cassandra_data:

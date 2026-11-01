@@ -172,4 +172,4 @@ def load_cassandra():
 - Los artistas se identifican por nombre tal como viene en el dataset; homónimos y variantes de escritura cuentan por separado.
 - Los agregados se recalculan desde el archivo; una escucha creada a mano con el CRUD no aparece en ellos.
 - Los duplicados se descartan dentro de cada lote. Entre lotes, `listens_by_user` no duplica (mismo id), pero los agregados contarían dos veces. En este dataset no hay duplicados: lo comprobamos sobre los 4,86 M registros.
-- En Windows el driver no tiene `libev` y escribe más lento que en Linux (unas 25 000 filas/s contra unas 37 000 en la misma prueba desde un contenedor Linux).
+

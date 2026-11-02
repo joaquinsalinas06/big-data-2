@@ -1,7 +1,3 @@
-"""Crea el keyspace y las tablas definidas en schema.cql.
-
-Uso: python -m cassandra_db.init_schema [--reset]
-"""
 import argparse
 from pathlib import Path
 

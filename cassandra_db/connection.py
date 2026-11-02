@@ -1,4 +1,3 @@
-"""Conexión a Cassandra. Host, puerto y keyspace se pueden cambiar por variables de entorno."""
 import os
 
 from cassandra.cluster import Cluster, ExecutionProfile, EXEC_PROFILE_DEFAULT

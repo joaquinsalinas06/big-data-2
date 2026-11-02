@@ -1,10 +1,3 @@
-"""Consultas de lectura para el dashboard.
-
-Cada función lee una sola partición, que es la consulta para la que se diseñó su tabla.
-Devuelven listas de dicts: en Streamlit basta con pd.DataFrame(rows).
-
-Uso: python -m cassandra_db.queries [--month 2026-10]
-"""
 import argparse
 import time
 

@@ -1,17 +1,3 @@
-"""Transforma el JSONL de escuchas y lo carga en Cassandra (paso 4 del DAG).
-
-1. Las escuchas se escriben en listens_by_user por lotes de líneas del archivo.
-   Cada lote queda registrado en load_batches y no se vuelve a escribir.
-2. Las tablas agregadas (daily_stats, top_artists_by_month, artist_monthly_listens,
-   user_daily_listens) se recalculan completas con todas las escuchas cargadas y
-   se sobrescriben. Repetir la ejecución da el mismo resultado: no suma nada dos veces.
-
-Con --max-batches se simula la llegada incremental de datos: cada ejecución agrega
-solo los siguientes N lotes pendientes. Usa siempre el mismo --batch-size, porque
-el id de cada lote depende de ese tamaño.
-
-Uso: python -m cassandra_db.load_listens [--file ...] [--batch-size 500000] [--max-batches 0]
-"""
 import argparse
 import json
 import sys
@@ -35,23 +21,6 @@ CONCURRENCY = 128
 ROWS_PER_BATCH = 30  # ~5 KB por BATCH, el umbral de aviso por defecto de Cassandra
 TOP_ARTISTS = 50
 LISTEN_NAMESPACE = uuid.uuid5(uuid.NAMESPACE_URL, "https://listenbrainz.org/listen")
-
-INSERT_LISTEN = """
-    INSERT INTO listens_by_user (user_id, month, listened_at, listen_id,
-                                 artist_name, track_name, release_name, recording_msid)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?)"""
-INSERT_BATCH = """
-    INSERT INTO load_batches (batch_id, source_file, first_line, last_line,
-                              rows_loaded, rows_skipped, duplicates, loaded_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?)"""
-INSERT_DAILY_STATS = """
-    INSERT INTO daily_stats (year, day, listens, active_users, listens_per_user, growth_pct)
-    VALUES (?, ?, ?, ?, ?, ?)"""
-INSERT_TOP_ARTIST = """
-    INSERT INTO top_artists_by_month (month, rank, artist_name, listens, share_pct)
-    VALUES (?, ?, ?, ?, ?)"""
-INSERT_ARTIST_MONTH = "INSERT INTO artist_monthly_listens (artist_name, month, listens) VALUES (?, ?, ?)"
-INSERT_USER_DAY = "INSERT INTO user_daily_listens (user_id, day, listens) VALUES (?, ?, ?)"
 
 
 class Listen(NamedTuple):
@@ -185,19 +154,47 @@ def top_artist_rows(per_artist_month):
 
 def write_aggregates(session, per_user_day, per_artist_month):
     by_first_column = itemgetter(0)  # en todas estas tablas la partición es la primera columna
-    write_by_partition(session, session.prepare(INSERT_DAILY_STATS), daily_stats_rows(per_user_day), by_first_column)
-    write_by_partition(session, session.prepare(INSERT_TOP_ARTIST), top_artist_rows(per_artist_month), by_first_column)
-    write_by_partition(session, session.prepare(INSERT_ARTIST_MONTH),
+
+    insert_daily_stats = session.prepare("""
+        INSERT INTO daily_stats (year, day, listens, active_users, listens_per_user, growth_pct)
+        VALUES (?, ?, ?, ?, ?, ?)
+    """)
+    write_by_partition(session, insert_daily_stats, daily_stats_rows(per_user_day), by_first_column)
+
+    insert_top_artist = session.prepare("""
+        INSERT INTO top_artists_by_month (month, rank, artist_name, listens, share_pct)
+        VALUES (?, ?, ?, ?, ?)
+    """)
+    write_by_partition(session, insert_top_artist, top_artist_rows(per_artist_month), by_first_column)
+
+    insert_artist_month = session.prepare("""
+        INSERT INTO artist_monthly_listens (artist_name, month, listens)
+        VALUES (?, ?, ?)
+    """)
+    write_by_partition(session, insert_artist_month,
                        [(artist, month, n) for (artist, month), n in per_artist_month.items()], by_first_column)
-    write_by_partition(session, session.prepare(INSERT_USER_DAY),
+
+    insert_user_day = session.prepare("""
+        INSERT INTO user_daily_listens (user_id, day, listens)
+        VALUES (?, ?, ?)
+    """)
+    write_by_partition(session, insert_user_day,
                        [(user, day, n) for (user, day), n in per_user_day.items()], by_first_column)
 
 
 def load_listens(session, path=DEFAULT_FILE, batch_size=DEFAULT_BATCH_SIZE, max_batches=0):
     """Carga los lotes pendientes y recalcula los agregados. Devuelve un resumen (sirve como XCom en Airflow)."""
     path = Path(path)
-    insert_listen = session.prepare(INSERT_LISTEN)
-    insert_batch = session.prepare(INSERT_BATCH)
+    insert_listen = session.prepare("""
+        INSERT INTO listens_by_user (user_id, month, listened_at, listen_id,
+                                     artist_name, track_name, release_name, recording_msid)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    """)
+    insert_batch = session.prepare("""
+        INSERT INTO load_batches (batch_id, source_file, first_line, last_line,
+                                  rows_loaded, rows_skipped, duplicates, loaded_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    """)
     loaded_before = {row["batch_id"] for row in session.execute("SELECT batch_id FROM load_batches")}
     per_user_day, per_artist_month = Counter(), Counter()
     summary = {"batches_loaded": 0, "batches_already_loaded": 0, "rows_loaded": 0, "rows_skipped": 0, "duplicates": 0}

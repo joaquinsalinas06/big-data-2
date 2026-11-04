@@ -106,7 +106,7 @@ source .venv/bin/activate
 python -m pip install -r requirements.txt
 cp .env.example .env
 # Cambia NEO4J_PASSWORD en .env antes de arrancar.
-docker compose up -d --wait
+docker compose --env-file .env -f neo4j/compose.yaml up -d --wait
 python neo4j/load.py
 python neo4j/analyze.py
 python neo4j/main.py
@@ -133,12 +133,12 @@ Abre [Neo4j Browser](http://localhost:7474). Las credenciales se configuran en t
 ```text
 big-data-2/
 ├── README.md
-├── compose.yaml              # Neo4j Community con persistencia
 ├── requirements.txt          # Driver, NetworkX y configuración local
 ├── .env.example              # Copiar a .env y cambiar contraseña
 ├── docs/                     # Dataset, Neo4j y futura etapa GCP
 ├── scripts/                  # Descarga multiplataforma y validación
 ├── neo4j/
+│   ├── compose.yaml           # Neo4j Community con persistencia
 │   ├── load.py                # Preparación y carga
 │   ├── analyze.py             # Análisis musical y KPIs
 │   ├── main.py                # Consultas

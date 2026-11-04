@@ -12,6 +12,7 @@ python neo4j/main.py
 
 ```text
 neo4j/
+├── compose.yaml            # Servicio local de Neo4j
 ├── load.py                 # Preparación y carga del dataset
 ├── analyze.py              # Afinidades, comunidades y publicación de resultados
 ├── main.py                 # Consultas y CRUD
@@ -59,10 +60,10 @@ python -m pip install -r requirements.txt
 cp .env.example .env
 ```
 
-Cambiar la contraseña de `.env` y encender Docker. Después:
+El servicio está definido en `neo4j/compose.yaml`. Cambiar la contraseña de `.env` y encender Docker. Ejecutar desde la raíz del repositorio:
 
 ```bash
-docker compose up -d --wait
+docker compose --env-file .env -f neo4j/compose.yaml up -d --wait
 python neo4j/load.py
 python neo4j/analyze.py
 python neo4j/main.py
@@ -139,4 +140,4 @@ NEO4J_INTEGRATION=1 python -m unittest discover -s neo4j/tests -v
 
 En PowerShell, definir antes `$env:NEO4J_INTEGRATION="1"`. Las pruebas no sustituyen el ensayo de la exposición. La ejecución nativa en Windows y Linux sigue pendiente.
 
-Los datos persisten con `docker compose stop` y `docker compose up -d --wait`. `docker compose down -v` elimina los volúmenes; no usarlo para un reinicio normal. Cambiar `.env` no cambia una contraseña ya inicializada en el volumen de Neo4j.
+Los datos persisten con `docker compose --env-file .env -f neo4j/compose.yaml stop` y `docker compose --env-file .env -f neo4j/compose.yaml up -d --wait`. `docker compose --env-file .env -f neo4j/compose.yaml down -v` elimina los volúmenes; no usarlo para un reinicio normal. Cambiar `.env` no cambia una contraseña ya inicializada en el volumen de Neo4j.

@@ -38,16 +38,16 @@ BASE="https://data.metabrainz.org/pub/musicbrainz/listenbrainz/incremental/liste
 FILE="listenbrainz-listens-dump-2746-20261027-000003-incremental.tar.zst"
 DEST="gs://$BUCKET/listenbrainz/2746/raw"
 
-mkdir -p /tmp/music-dna
-curl -fL --retry 3 -C - -o "/tmp/music-dna/$FILE" "$BASE/$FILE"
-curl -fL --retry 3 -o "/tmp/music-dna/$FILE.sha256" "$BASE/$FILE.sha256"
+mkdir -p /tmp/listenbrainz
+curl -fL --retry 3 -C - -o "/tmp/listenbrainz/$FILE" "$BASE/$FILE"
+curl -fL --retry 3 -o "/tmp/listenbrainz/$FILE.sha256" "$BASE/$FILE.sha256"
 
-EXPECTED=$(awk 'NR==1 {print $1}' "/tmp/music-dna/$FILE.sha256")
-ACTUAL=$(shasum -a 256 "/tmp/music-dna/$FILE" | awk '{print $1}')
+EXPECTED=$(awk 'NR==1 {print $1}' "/tmp/listenbrainz/$FILE.sha256")
+ACTUAL=$(shasum -a 256 "/tmp/listenbrainz/$FILE" | awk '{print $1}')
 test "$EXPECTED" = "$ACTUAL" || { echo "ERROR: SHA-256 distinto"; exit 1; }
 
-gcloud storage cp "/tmp/music-dna/$FILE" "$DEST/$FILE"
-gcloud storage cp "/tmp/music-dna/$FILE.sha256" "$DEST/$FILE.sha256"
+gcloud storage cp "/tmp/listenbrainz/$FILE" "$DEST/$FILE"
+gcloud storage cp "/tmp/listenbrainz/$FILE.sha256" "$DEST/$FILE.sha256"
 gcloud storage ls "$DEST/"
 ```
 

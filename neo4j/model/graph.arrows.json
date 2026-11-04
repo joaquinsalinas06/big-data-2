@@ -1,0 +1,162 @@
+{
+  "nodes": [
+    {
+      "id": "u",
+      "position": {
+        "x": 170,
+        "y": 280
+      },
+      "caption": "Usuario",
+      "labels": [
+        "Usuario"
+      ],
+      "properties": {
+        "id": "usuario_ficticio"
+      },
+      "style": {
+        "node-color": "#CFE4FF"
+      }
+    },
+    {
+      "id": "c",
+      "position": {
+        "x": 540,
+        "y": 280
+      },
+      "caption": "Cancion",
+      "labels": [
+        "Cancion"
+      ],
+      "properties": {
+        "id": "msid_ficticio",
+        "titulo": "Canción de ejemplo"
+      },
+      "style": {
+        "node-color": "#D3F2E4"
+      }
+    },
+    {
+      "id": "a",
+      "position": {
+        "x": 910,
+        "y": 280
+      },
+      "caption": "Artista",
+      "labels": [
+        "Artista"
+      ],
+      "properties": {
+        "nombre": "Artista A"
+      },
+      "style": {
+        "node-color": "#FFE8BC"
+      }
+    },
+    {
+      "id": "b",
+      "position": {
+        "x": 910,
+        "y": 620
+      },
+      "caption": "Artista",
+      "labels": [
+        "Artista"
+      ],
+      "properties": {
+        "nombre": "Artista B"
+      },
+      "style": {
+        "node-color": "#FFE8BC"
+      }
+    },
+    {
+      "id": "com",
+      "position": {
+        "x": 540,
+        "y": 620
+      },
+      "caption": "Comunidad",
+      "labels": [
+        "Comunidad"
+      ],
+      "properties": {
+        "id": "analisis_ejemplo:c1"
+      },
+      "style": {
+        "node-color": "#E6DCFA"
+      }
+    }
+  ],
+  "relationships": [
+    {
+      "id": "r0",
+      "fromId": "u",
+      "toId": "c",
+      "type": "ESCUCHO",
+      "properties": {
+        "lote": "2746",
+        "cantidad": "12",
+        "primera_escucha": "UTC",
+        "ultima_escucha": "UTC"
+      },
+      "style": {}
+    },
+    {
+      "id": "r1",
+      "fromId": "c",
+      "toId": "a",
+      "type": "INTERPRETADA_POR",
+      "properties": {
+        "lote": "2746"
+      },
+      "style": {}
+    },
+    {
+      "id": "r2",
+      "fromId": "u",
+      "toId": "a",
+      "type": "ESCUCHA_ARTISTA",
+      "properties": {
+        "lote": "2746",
+        "cantidad": "30",
+        "proporcion": "0.25"
+      },
+      "style": {}
+    },
+    {
+      "id": "r3",
+      "fromId": "a",
+      "toId": "b",
+      "type": "AFIN_A",
+      "properties": {
+        "analisis": "ejemplo",
+        "jaccard": "0.12",
+        "usuarios_comunes": "17"
+      },
+      "style": {}
+    },
+    {
+      "id": "r4",
+      "fromId": "a",
+      "toId": "com",
+      "type": "PERTENECE_A",
+      "properties": {
+        "analisis": "ejemplo",
+        "puente": "0.35"
+      },
+      "style": {}
+    },
+    {
+      "id": "r5",
+      "fromId": "b",
+      "toId": "com",
+      "type": "PERTENECE_A",
+      "properties": {
+        "analisis": "ejemplo",
+        "puente": "0.10"
+      },
+      "style": {}
+    }
+  ],
+  "style": {}
+}

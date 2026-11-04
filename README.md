@@ -111,6 +111,7 @@ python3 scripts/validate_dataset.py
 | [Descarga en Windows](scripts/download_dataset.ps1) | PowerShell: descarga, SHA-256 y extracción |
 | [Descarga en Linux/macOS](scripts/download_dataset.sh) | Bash: descarga, SHA-256 y extracción |
 | [Validador común](scripts/validate_dataset.py) | Comprobación de los registros JSON con Python |
+| [Cassandra](cassandra_db/README.md) | Modelo de tablas, carga por lotes, CRUD y KPIs diarios |
 
 ## Organización inicial
 

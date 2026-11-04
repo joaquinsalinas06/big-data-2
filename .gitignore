@@ -1,6 +1,7 @@
 # Dataset: no versionar archivos grandes ni datos de usuarios
 data/raw/
 data/processed/
+data/neo4j/
 *.jsonl
 *.listens
 *.tar.zst

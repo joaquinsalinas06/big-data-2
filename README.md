@@ -1,8 +1,8 @@
-# Big Data 2 — Music DNA
+# Big Data 2 — ListenBrainz
 
 **Proyecto Grupal II · Big Data** · Entrega: **17 de noviembre de 2026**
 
-**Music DNA** es una propuesta académica para explorar hábitos de escucha y comunidades musicales a partir de datos públicos de [ListenBrainz](https://listenbrainz.org/data/). Por ahora el repositorio contiene **el dataset, instrucciones de descarga y validación**, sin desarrollar todavía las bases de datos ni el dashboard.
+Este proyecto explora hábitos de escucha y comunidades musicales a partir de datos públicos de [ListenBrainz](https://listenbrainz.org/data/). El repositorio incluye descarga y validación del dataset, **Neo4j local, recomendaciones explicables, comunidades musicales e indicadores**. MongoDB, Cassandra, Airflow, dashboard y GCP son las siguientes etapas.
 
 ## Dataset de referencia
 
@@ -94,18 +94,34 @@ OK: dataset validado
 
 El archivo aparecerá en `data/processed/listens_full.jsonl`. Si falla el checksum, **no utilices el archivo**: vuelve a descargarlo. Si falta espacio, libera al menos unos gigabytes antes de extraer.
 
-**Si ya descargaste el dataset en tu Mac:** evita duplicar los 2,6 GB. Desde la raíz del repositorio:
+## Neo4j: empezar aquí
+
+Para leer el código y exponer siguiendo el estilo de la semana 12, empieza por **[main.py](neo4j/main.py)** y las funciones de `neo4j/graph/`. La [guía de Neo4j](neo4j/README.md) explica la estructura.
+
+Sigue la [guía local de Neo4j](neo4j/README.md). Incluye instalación para macOS/Linux y Windows, carga completa, consultas, KPIs, comunidades y operaciones CRUD.
 
 ```bash
-mkdir -p data/processed
-ln -s "$HOME/dev/music-dna/data/processed/listens_full.jsonl" data/processed/listens_full.jsonl
-python3 scripts/validate_dataset.py
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install -r requirements.txt
+cp .env.example .env
+# Cambia NEO4J_PASSWORD en .env antes de arrancar.
+docker compose --env-file .env -f neo4j/compose.yaml up -d --wait
+python neo4j/load.py
+python neo4j/analyze.py
+python neo4j/main.py
 ```
+
+Abre [Neo4j Browser](http://localhost:7474). Las credenciales se configuran en tu `.env` local. Los datos persisten en un volumen Docker.
+
+**En la Mac donde comenzó el proyecto**, los archivos descargados se trasladaron a `data/raw/` y `data/processed/` de este repositorio. Los compañeros generan las mismas rutas mediante los scripts de descarga anteriores; los datos no se incluyen en Git.
 
 ## Documentación del equipo
 
 | Documento | Para qué sirve |
 | --- | --- |
+| [Código Python para la exposición](neo4j/main.py) | Consultas y CRUD organizados como el manual de la semana 12 |
+| [Neo4j local y experiencias](neo4j/README.md) | Inicio, modelo, recomendaciones, comunidades, KPIs y pruebas |
 | [Dataset y esquema](docs/dataset.md) | Origen, estructura JSON, tipos de descarga y limitaciones |
 | [Descarga y almacenamiento en GCP](docs/gcp.md) | Alternativa para guardar el comprimido en un bucket privado compartido |
 | [Descarga en Windows](scripts/download_dataset.ps1) | PowerShell: descarga, SHA-256 y extracción |
@@ -113,22 +129,29 @@ python3 scripts/validate_dataset.py
 | [Validador común](scripts/validate_dataset.py) | Comprobación de los registros JSON con Python |
 | [Cassandra](cassandra_db/README.md) | Modelo de tablas, carga por lotes, CRUD y KPIs diarios |
 
-## Organización inicial
+## Organización
 
 ```text
 big-data-2/
 ├── README.md
-├── .gitignore
-├── docs/
-│   ├── dataset.md
-│   └── gcp.md
-├── scripts/
-│   ├── download_dataset.ps1
-│   ├── download_dataset.sh
-│   └── validate_dataset.py
-└── data/                  # Se crea al descargar; NO se sube a Git
+├── requirements.txt          # Driver, NetworkX y configuración local
+├── .env.example              # Copiar a .env y cambiar contraseña
+├── docs/                     # Dataset, Neo4j y futura etapa GCP
+├── scripts/                  # Descarga multiplataforma y validación
+├── neo4j/
+│   ├── compose.yaml           # Neo4j Community con persistencia
+│   ├── load.py                # Preparación y carga
+│   ├── analyze.py             # Análisis musical y KPIs
+│   ├── main.py                # Consultas
+│   ├── database.py            # Conexión y rutas
+│   ├── graph/                 # Consultas y CRUD
+│   ├── model/                 # Esquema, diagrama y JSON de Arrows.app
+│   ├── tests/
+│   └── README.md
+└── data/                     # Local, fuera de Git
     ├── raw/
-    └── processed/
+    ├── processed/
+    └── neo4j/                # Agregaciones y resultados regenerables
 ```
 
 Los datos brutos no se versionan: cada integrante puede recuperarlos desde ListenBrainz o, cuando el equipo lo habilite, desde **Google Cloud Storage**. **Todavía no se ha creado ningún bucket ni desplegado recursos en GCP.** Ver [guía de GCP](docs/gcp.md).

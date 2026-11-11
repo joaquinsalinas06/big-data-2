@@ -1,164 +1,153 @@
-# Big Data 2 — ListenBrainz
+﻿# ListenBrainz: API con Python y MongoDB
 
-**Proyecto Grupal II · Big Data** · Entrega: **17 de noviembre de 2026**
+API REST para guardar, consultar, actualizar y eliminar reproducciones musicales. Está desarrollada con Python 3.12, FastAPI, Pydantic y PyMongo.
 
-Este proyecto explora hábitos de escucha y comunidades musicales a partir de datos públicos de [ListenBrainz](https://listenbrainz.org/data/). El repositorio incluye descarga y validación del dataset, **Neo4j local, recomendaciones explicables, comunidades musicales e indicadores**. MongoDB, Cassandra, Airflow, dashboard y GCP son las siguientes etapas.
+Los datos se guardan en la base `listenbrainz_db`, colección `listens`. Actualmente contiene **4 millones de reproducciones reales de ListenBrainz**. Los 50 000 registros originales se conservaron sin cambios.
 
-## Dataset de referencia
+## 1. Iniciar la API
 
-- **Fuente:** ListenBrainz / MetaBrainz (registros públicos de escuchas).
-- **Archivo de referencia:** incremental del **27 de octubre de 2026**, secuencia **2746**.
-- **Datos observados en la validación local:** **4 855 809** registros JSON Lines; **238 MB comprimido** y **aprox. 2,6 GB extraído**.
-- **Campos principales:** `user_id`, `user_name`, `timestamp` y `track_metadata` (incluye `track_name` y `artist_name`). `recording_msid` y otros metadatos pueden ser opcionales.
-- **Importante:** es un **incremental**, no el histórico completo de ListenBrainz. Contiene escuchas fechadas entre 2005 y 2026, incorporadas al sistema en este lote.
+Necesitas Python 3.12 y MongoDB local en ejecución.
 
-## Instalación y descarga por sistema operativo
-
-En todos los sistemas se descarga el **mismo archivo oficial**, se comprueba el **SHA-256** y se obtiene `data/processed/listens_full.jsonl`. Reserva al menos **4 GB de espacio libre**, además de Git y Python; el espacio exacto necesario puede variar.
-
-### 1. Windows — PowerShell (sin WSL)
-
-**Recomendado para los compañeros que usan Windows 10/11.** Abre **PowerShell** o Windows Terminal (no CMD). Instala [Git](https://git-scm.com/install/windows) y **Python 3.14** con WinGet:
-
-```powershell
-winget install --id Git.Git -e --source winget
-winget install --id Python.Python.3.14 -e --source winget
-```
-
-Cierra y vuelve a abrir PowerShell para que reconozca los programas. Comprueba:
-
-```powershell
-git --version
-python --version
-```
-
-**Descargar y validar** desde PowerShell:
-
-```powershell
-git clone https://github.com/joaquinsalinas06/big-data-2.git
-cd big-data-2
-
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\download_dataset.ps1 -Extract
-python .\scripts\validate_dataset.py
-```
-
-- `download_dataset.ps1` usa `curl.exe` y `Get-FileHash` para verificar la descarga, y Python **3.14+** para extraer `.tar.zst` sin instalar `zstd` ni WSL.
-- Si Windows muestra «`python` no se reconoce», reinicia la terminal y revisa la instalación/alias de Python.
-- El script comprueba SHA-256 **antes** de extraer y **no sobrescribe** un JSONL ya existente.
-- **Estado de pruebas:** las instrucciones están basadas en las herramientas oficiales, pero aún **no se han probado en una computadora Windows** del grupo.
-
-### 2. Linux — Ubuntu / Debian
-
-Instala las dependencias en la terminal. En otras distribuciones utiliza el gestor de paquetes correspondiente:
+Desde la terminal **Git Bash de Visual Studio Code**, ubicada en la carpeta del proyecto, ejecuta:
 
 ```bash
-sudo apt update
-sudo apt install -y git curl zstd python3 tar coreutils
-
-git clone https://github.com/joaquinsalinas06/big-data-2.git
-cd big-data-2
-
-bash scripts/download_dataset.sh --extract
-python3 scripts/validate_dataset.py
+./.venv/Scripts/python.exe main.py
 ```
 
-El script Bash usa `sha256sum` de Linux (o `shasum` como alternativa), lee el comprimido por streaming y guarda el JSONL sin cargar todo el dataset en RAM. **No se ha probado todavía en una máquina Linux del grupo.**
-
-### 3. macOS — Terminal
-
-Instala [Homebrew](https://brew.sh/) si aún no lo tienes. Luego:
+Si es la primera instalación, crea el entorno e instala las dependencias antes de iniciar:
 
 ```bash
-brew install zstd
-
-git clone https://github.com/joaquinsalinas06/big-data-2.git
-cd big-data-2
-
-bash scripts/download_dataset.sh --extract
-python3 scripts/validate_dataset.py
+py -3.12 -m venv .venv
+./.venv/Scripts/python.exe -m pip install -r requirements.txt
 ```
 
-Se requiere Git y Python 3. Si falta alguno, puedes instalarlo con Homebrew: `brew install git python`. **La descarga y extracción de este dump ya se verificaron en macOS**; el script versionado automatiza los mismos pasos.
+Abre **http://127.0.0.1:8000/docs** para probar la API desde Swagger. Mantén la terminal abierta; para detener el servidor, pulsa **Ctrl + C**.
 
-### Resultado esperado
+La dirección `http://127.0.0.1:8000/` devuelve `Not Found` porque no tiene una ruta definida. Utiliza `/docs` o `/listens`.
 
-Al finalizar, el validador debe mostrar aproximadamente:
+La conexión predeterminada es `mongodb://localhost:27017/`. Se puede cambiar con la variable de entorno `MONGO_URI`. La API está preparada para uso local y no incluye autenticación.
+
+## 2. Usar el CRUD
+
+CRUD significa crear, consultar, actualizar y eliminar. Cada solicitud es independiente: puedes realizar varias operaciones sobre distintos documentos sin reiniciar el servidor.
+
+| Método | Ruta | Qué hace |
+| --- | --- | --- |
+| POST | `/listens` | Crea una reproducción |
+| GET | `/listens` | Consulta con filtros y páginas |
+| GET | `/listens/{listen_id}` | Consulta una reproducción por su identificador |
+| PATCH | `/listens/{listen_id}` | Cambia los campos enviados |
+| PUT | `/listens/{listen_id}` | Reemplaza el contenido completo |
+| DELETE | `/listens/{listen_id}` | Elimina una reproducción |
+| GET | `/listens/feed` | Recorre los resultados usando un cursor |
+| GET | `/listens/stats/summary` | Muestra reproducciones y usuarios únicos |
+| GET | `/listens/stats/top-artists` | Muestra los artistas más escuchados |
+
+En Swagger, abre **POST /listens**, pulsa **Try it out**, pega este ejemplo y pulsa **Execute**:
+
+```json
+{
+  "user_name": "demo_user",
+  "timestamp": 1793318246,
+  "track_metadata": {
+    "track_name": "Demo song",
+    "artist_name": "Demo artist"
+  }
+}
+```
+
+La respuesta devuelve un `id`. Utilízalo para consultar, actualizar o eliminar ese documento de prueba. Para cambiar solamente la canción con PATCH:
+
+```json
+{"track_metadata": {"track_name": "Updated song"}}
+```
+
+Los documentos creados desde Swagger permanecen guardados hasta que los elimines. La guía completa está en [docs/crud_guide.md](docs/crud_guide.md).
+
+### Filtros y páginas
+
+Las consultas aceptan `user_name`, `artist_name`, `start_timestamp` y `end_timestamp`. Las fechas son segundos Unix y los nombres se comparan exactamente.
+
+Ejemplo:
 
 ```text
-=== VALIDACIÓN LISTENBRAINZ ===
-Registros leídos: 4,855,809
-Registros válidos: 4,855,809
-Registros inválidos: 0
-OK: dataset validado
+http://127.0.0.1:8000/listens?user_name=demo_user&page=1&limit=10
 ```
 
-El archivo aparecerá en `data/processed/listens_full.jsonl`. Si falla el checksum, **no utilices el archivo**: vuelve a descargarlo. Si falta espacio, libera al menos unos gigabytes antes de extraer.
+Puedes ordenar con `sort_by` y `sort_order=asc` o `desc`. El límite máximo es de 100 documentos por solicitud. Para recorrer muchos resultados, usa `/listens/feed` y envía el `next_cursor` recibido en la siguiente solicitud, manteniendo los mismos filtros.
 
-## Neo4j: empezar aquí
+Las respuestas principales son: **200** operación correcta, **201** creación, **204** eliminación, **400** parámetros incoherentes o identificador inválido, **404** documento inexistente, **422** datos inválidos y **503** error de MongoDB.
 
-Para leer el código y exponer siguiendo el estilo de la semana 12, empieza por **[main.py](neo4j/main.py)** y las funciones de `neo4j/graph/`. La [guía de Neo4j](neo4j/README.md) explica la estructura.
+## 3. Ejecutar las pruebas
 
-Sigue la [guía local de Neo4j](neo4j/README.md). Incluye instalación para macOS/Linux y Windows, carga completa, consultas, KPIs, comunidades y operaciones CRUD.
+Con la API iniciada, abre otra terminal Git Bash y ejecuta tres rondas CRUD:
 
 ```bash
-python3 -m venv .venv
-source .venv/bin/activate
-python -m pip install -r requirements.txt
-cp .env.example .env
-# Cambia NEO4J_PASSWORD en .env antes de arrancar.
-docker compose --env-file .env -f neo4j/compose.yaml up -d --wait
-python neo4j/load.py
-python neo4j/analyze.py
-python neo4j/main.py
+./.venv/Scripts/python.exe -m scripts.demo_crud --rounds 3
 ```
 
-Abre [Neo4j Browser](http://localhost:7474). Las credenciales se configuran en tu `.env` local. Los datos persisten en un volumen Docker.
+Cada ronda crea, consulta, actualiza y elimina su propio documento de prueba.
 
-**En la Mac donde comenzó el proyecto**, los archivos descargados se trasladaron a `data/raw/` y `data/processed/` de este repositorio. Los compañeros generan las mismas rutas mediante los scripts de descarga anteriores; los datos no se incluyen en Git.
+Para ejecutar las pruebas automatizadas, sin necesidad de iniciar el servidor:
 
-## Documentación del equipo
+```bash
+./.venv/Scripts/python.exe -m pytest -q
+```
 
-| Documento | Para qué sirve |
+Para incluir la prueba sobre MongoDB real:
+
+```bash
+RUN_MONGO_TESTS=1 ./.venv/Scripts/python.exe -m pytest -q
+```
+
+La prueba real elimina únicamente sus documentos temporales. Ejecútala cuando no haya importaciones ni otras escrituras simultáneas.
+
+La validación realizada terminó con **12 pruebas aprobadas**, tres rondas CRUD correctas y cuatro consultas que utilizaron índices. Detalles en [evidencias/final_validation.md](evidencias/final_validation.md).
+
+## 4. Importar datos
+
+**Los cuatro millones ya están cargados. No necesitas volver a importarlos para usar la API.**
+
+El importador lee archivos reales de [ListenBrainz](https://listenbrainz.org/data/) línea por línea, inserta por lotes, evita duplicados y guarda el avance para poder continuar después de una interrupción. Usa SQLite únicamente para guardar ese control; las reproducciones se almacenan en MongoDB.
+
+Para simular la lectura de 1000 líneas sin insertar:
+
+```bash
+./.venv/Scripts/python.exe -m scripts.import_listens --limit 1000
+```
+
+Para una carga pequeña, añade `--apply`. Para cargar hasta un total de cuatro millones:
+
+```bash
+./.venv/Scripts/python.exe -m scripts.import_listens --full --apply --target 4000000
+```
+
+El objetivo incluye los registros existentes. Puedes indicar otro archivo con `--source "ruta/archivo.listens"`. Los archivos comprimidos deben extraerse antes. Repetir el comando reanuda la carga; no ejecutes varios importadores a la vez ni modifiques el archivo de origen durante el proceso.
+
+El estado se guarda en `data/import_state.sqlite3` y las líneas inválidas en `data/import_state.errors.jsonl`. La carga realizada insertó 3 950 000 documentos nuevos, reconoció los 50 000 existentes y no registró líneas inválidas.
+
+## 5. Organización del proyecto
+
+| Archivo o carpeta | Responsabilidad |
 | --- | --- |
-| [Código Python para la exposición](neo4j/main.py) | Consultas y CRUD organizados como el manual de la semana 12 |
-| [Neo4j local y experiencias](neo4j/README.md) | Inicio, modelo, recomendaciones, comunidades, KPIs y pruebas |
-| [Dataset y esquema](docs/dataset.md) | Origen, estructura JSON, tipos de descarga y limitaciones |
-| [Descarga y almacenamiento en GCP](docs/gcp.md) | Alternativa para guardar el comprimido en un bucket privado compartido |
-| [Descarga en Windows](scripts/download_dataset.ps1) | PowerShell: descarga, SHA-256 y extracción |
-| [Descarga en Linux/macOS](scripts/download_dataset.sh) | Bash: descarga, SHA-256 y extracción |
-| [Validador común](scripts/validate_dataset.py) | Comprobación de los registros JSON con Python |
-| [Cassandra](cassandra_db/README.md) | Modelo de tablas, carga por lotes, CRUD y KPIs diarios |
+| `main.py` | Iniciar el servidor |
+| `app/config.py` | Configuración de MongoDB |
+| `app/database.py` | Conexión e índices |
+| `app/models.py` | Validación de datos |
+| `app/errors.py` | Errores propios de la aplicación |
+| `app/main.py` | Configuración de FastAPI y manejo de errores |
+| `app/routes/listens.py` | Endpoints HTTP |
+| `app/services/` | Lógica del CRUD y de la importación |
+| `app/repositories/` | Operaciones PyMongo |
+| `scripts/` | Demostraciones, consultas y verificaciones |
+| `tests/` | Pruebas automatizadas |
+| `evidencias/` | Resultados de las comprobaciones |
 
-## Organización
+Para verificar índices o consultar estadísticas desde Python:
 
-```text
-big-data-2/
-├── README.md
-├── requirements.txt          # Driver, NetworkX y configuración local
-├── .env.example              # Copiar a .env y cambiar contraseña
-├── docs/                     # Dataset, Neo4j y futura etapa GCP
-├── scripts/                  # Descarga multiplataforma y validación
-├── neo4j/
-│   ├── compose.yaml           # Neo4j Community con persistencia
-│   ├── load.py                # Preparación y carga
-│   ├── analyze.py             # Análisis musical y KPIs
-│   ├── main.py                # Consultas
-│   ├── database.py            # Conexión y rutas
-│   ├── graph/                 # Consultas y CRUD
-│   ├── model/                 # Esquema, diagrama y JSON de Arrows.app
-│   ├── tests/
-│   └── README.md
-└── data/                     # Local, fuera de Git
-    ├── raw/
-    ├── processed/
-    └── neo4j/                # Agregaciones y resultados regenerables
+```bash
+./.venv/Scripts/python.exe -m scripts.verify_indexes
+./.venv/Scripts/python.exe -m scripts.queries
 ```
 
-Los datos brutos no se versionan: cada integrante puede recuperarlos desde ListenBrainz o, cuando el equipo lo habilite, desde **Google Cloud Storage**. **Todavía no se ha creado ningún bucket ni desplegado recursos en GCP.** Ver [guía de GCP](docs/gcp.md).
-
-### Fuentes
-
-- [Descargas oficiales de ListenBrainz](https://listenbrainz.org/data/)
-- [Documentación del dataset](https://listenbrainz.readthedocs.io/en/latest/users/listenbrainz-dumps.html)
-- [Directorio de incrementales](https://data.metabrainz.org/pub/musicbrainz/listenbrainz/incremental/)
-- [Python 3.14 — soporte Zstandard en tarfile](https://docs.python.org/3.14/library/tarfile.html)
+El código principal está en `app/`. `main.py` inicia la API y `scripts/` contiene las herramientas de apoyo. Las evidencias finales y el registro de importación se conservan en `evidencias/`.

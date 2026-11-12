@@ -1,0 +1,20 @@
+# MongoDB para desarrollo local.
+# Uso: docker compose -f mongodb/docker-compose.yml up -d
+services:
+  mongodb:
+    image: mongo:7.0
+    container_name: music-dna-mongodb
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_DATABASE: listenbrainz_db
+    volumes:
+      - mongodb_data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  mongodb_data:

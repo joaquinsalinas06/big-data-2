@@ -1,4 +1,27 @@
-neo4j==6.4.1
-networkx==3.7
-python-dotenv==1.2.4
-pytz==2026.5
+# === Base de Datos: Neo4j (Grafo) ===
+neo4j>=5.20.0,<7
+networkx>=3.2
+
+# === Base de Datos: Cassandra (Series Temporales) ===
+cassandra-driver>=3.29.0
+pyasyncore
+
+# === Base de Datos: MongoDB (Documental) ===
+pymongo>=4.10.0,<5
+
+# === API REST & Validación (MongoDB) ===
+fastapi>=0.115.0,<1
+pydantic>=2.10.0,<3
+uvicorn>=0.32.0,<1
+httpx>=0.27.0,<1
+
+# === Dashboard & Analítica (Streamlit) ===
+streamlit>=1.30.0
+pandas>=2.0.0
+plotly>=5.18.0
+
+# === Utilidades, Configuración & Testing ===
+python-dotenv>=1.0.0
+pytz>=2024.1
+pytest>=8.0.0
+mongomock>=4.3.0

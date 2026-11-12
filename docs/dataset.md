@@ -39,7 +39,7 @@ Estas cantidades proceden de una exploración local inicial; son descriptivas de
 
 La preparación completa posterior comprobó que las **4 855 809** filas de este lote tienen `user_id` entero y `recording_msid` no vacío. Identificó **1 420 842 recording_msid distintos**, frente a las 1 066 683 combinaciones de artista y título contadas anteriormente: son criterios de identidad diferentes. El grafo utiliza el identificador, sin fusionar canciones por título. Esto no garantiza equivalencia con grabaciones canónicas de MusicBrainz.
 
-Los archivos originales y la muestra de 200 mil filas se trasladaron al directorio `data/` de este repositorio. Los comandos compartidos dependen de las rutas del repositorio, sin enlaces a otra carpeta de una laptop. Ver [modelo y carga de Neo4j](../neo4j/README.md) y [resultados verificados](neo4j-results.md).
+Los archivos originales y la muestra de 200 mil filas se trasladaron al directorio `data/` de este repositorio. Los comandos compartidos dependen de las rutas del repositorio, sin enlaces a otra carpeta de una laptop. Ver [modelo y carga de Neo4j](../databases/neo4j/README.md) y [resultados verificados](neo4j.md).
 
 ## 3. Formato de cada registro
 

@@ -2,18 +2,18 @@
 
 **Proyecto Grupal II · Big Data** · Fecha de entrega: **17 de noviembre de 2026**
 
-Este proyecto implementa una **arquitectura multimodelo** para almacenar, procesar y analizar hábitos de escucha musical a partir de datos públicos de [ListenBrainz](https://listenbrainz.org/data/). 
+Este proyecto implementa una **arquitectura multimodelo limpia y desacoplada** para almacenar, procesar y analizar hábitos de escucha musical a partir de datos públicos de [ListenBrainz](https://listenbrainz.org/data/).
 
-El sistema utiliza tres tecnologías de almacenamiento complementarias:
-1. **MongoDB (`mongodb/`):** Almacenamiento de documentos originales semiestructurados (JSON) y API REST.
-2. **Apache Cassandra (`cassandra_db/`):** Almacenamiento columnar optimizado para series temporales y consultas masivas de históricos.
-3. **Neo4j (`neo4j/`):** Modelado de grafo para relaciones de usuarios, escuchas, canciones y artistas, con recomendaciones explicables y comunidades.
+Toda la capa de persistencia se encuentra centralizada bajo el directorio [`databases/`](databases/), organizada en 3 motores complementarios:
+1. **MongoDB ([`databases/mongodb/`](databases/mongodb)):** Almacenamiento de documentos originales semiestructurados (JSON) y API REST.
+2. **Apache Cassandra ([`databases/cassandra/`](databases/cassandra)):** Almacenamiento columnar optimizado para series temporales y consultas masivas de históricos.
+3. **Neo4j ([`databases/neo4j/`](databases/neo4j)):** Modelado de grafo para relaciones de usuarios, canciones y artistas, con recomendaciones y comunidades.
 
 ---
 
 ## 🚀 Inicio Rápido con Docker
 
-El repositorio cuenta con un `docker-compose.yml` unificado en la raíz para levantar todas las bases de datos de forma local:
+El repositorio cuenta con un [`docker-compose.yml`](docker-compose.yml) unificado en la raíz para levantar todas las bases de datos de forma local:
 
 ```bash
 # 1. Copiar configuración de variables de entorno
@@ -77,42 +77,44 @@ El dataset extraído queda en `data/processed/listens_full.jsonl` (ignorado por 
 
 ---
 
-## 🛠️ Demostración de CRUD por Base de Datos
+## 🛠️ Interfaz Estandarizada por Base de Datos
 
-Cada módulo cuenta con scripts estandarizados para demostrar las 4 operaciones básicas (Create, Read, Update, Delete) requeridas para la exposición:
+Cada base de datos cuenta con una **interfaz simétrica y estandarizada** para todas sus operaciones:
 
-### 1. MongoDB
+### 1. Demostración de CRUD (Para Video y Exposición)
 ```bash
-# CRUD directo interactivo
-python -m mongodb.crud --pause
+# MongoDB
+python -m databases.mongodb.crud --pause
 
-# Consultas analíticas y agregaciones
-python -m mongodb.queries
+# Apache Cassandra
+python -m databases.cassandra.crud --pause
 
-# (Opcional) Servidor API FastAPI
-python -m mongodb.api_server
+# Neo4j
+python -m databases.neo4j.crud --pause
 ```
 
-### 2. Apache Cassandra
+### 2. Carga Masiva de Datos (Loaders para Airflow o CLI)
 ```bash
-# Inicializar keyspace y tablas
-python -m cassandra_db.init_schema
+# Carga a MongoDB
+python -m databases.mongodb.loader --limit 50000
 
-# CRUD interactivo
-python -m cassandra_db.crud --pause
+# Carga a Cassandra
+python -m databases.cassandra.loader --limit 50000
 
-# Consultas analíticas
-python -m cassandra_db.queries
+# Carga a Neo4j
+python -m databases.neo4j.loader
 ```
 
-### 3. Neo4j
+### 3. Consultas Analíticas y Agregaciones
 ```bash
-# Carga inicial y análisis
-python neo4j/load.py
-python neo4j/analyze.py
+# Consultas en MongoDB
+python -m databases.mongodb.queries
 
-# CRUD y consultas de grafo
-python neo4j/main.py
+# Consultas en Cassandra
+python -m databases.cassandra.queries
+
+# Consultas en Neo4j (grafo, comunidades, KPIs)
+python -m databases.neo4j.queries
 ```
 
 ---
@@ -121,47 +123,67 @@ python neo4j/main.py
 
 ```text
 big-data-2/
-├── docker-compose.yml          # Stack unificado (MongoDB + Cassandra + Neo4j)
-├── requirements.txt            # Dependencias unificadas de todo el proyecto
-├── .env.example                # Plantilla de variables de entorno
+├── docker-compose.yml              # Stack unificado de servicios Docker
+├── requirements.txt                # Dependencias únicas y versionadas
+├── .env.example                    # Plantilla de variables de entorno
 │
-├── mongodb/                    # Módulo MongoDB (Documental & JSON)
-│   ├── connection.py           # Conexión centralizada PyMongo
-│   ├── crud.py                 # Demo CRUD estándar en consola
-│   ├── load_listens.py         # Carga masiva por lotes
-│   ├── queries.py              # Agregaciones analíticas
-│   ├── docker-compose.yml      # Compose aislado de MongoDB
-│   ├── app/                    # API REST con FastAPI (rutas, modelos, servicios)
-│   ├── tests/                  # Pruebas unitarias
-│   └── README.md
+├── databases/                      # 📁 Capa de persistencia multimodelo
+│   │
+│   ├── mongodb/                    # Motor Documental (JSON)
+│   │   ├── connection.py           # Conexión centralizada PyMongo
+│   │   ├── crud.py                 # Runner interactivo de CRUD
+│   │   ├── loader.py               # Carga masiva por lotes
+│   │   ├── queries.py              # Agregaciones analíticas
+│   │   ├── docker-compose.yml      # Compose individual
+│   │   ├── app/                    # API REST con FastAPI (rutas, modelos, servicios)
+│   │   ├── tools/                  # Scripts de prueba y verificación
+│   │   ├── tests/                  # Pruebas unitarias
+│   │   └── README.md
+│   │
+│   ├── cassandra/                  # Motor de Series Temporales (Columnar)
+│   │   ├── connection.py           # Conexión cassandra-driver
+│   │   ├── crud.py                 # Runner interactivo de CRUD
+│   │   ├── loader.py               # Carga masiva optimizada
+│   │   ├── queries.py              # Consultas de series de tiempo
+│   │   ├── schema.cql              # DDL de tablas CQL
+│   │   ├── init_schema.py          # Script inicializador de keyspace
+│   │   ├── docker-compose.yml      # Compose individual
+│   │   └── README.md
+│   │
+│   └── neo4j/                      # Motor de Grafo (Relaciones)
+│       ├── connection.py           # Conexión con driver Neo4j
+│       ├── crud.py                 # Runner interactivo de CRUD en Cypher
+│       ├── loader.py               # Carga de nodos y relaciones
+│       ├── queries.py              # Consultas analíticas y algoritmos
+│       ├── analyze.py              # Detección de comunidades (NetworkX)
+│       ├── model/                  # Esquema y restricciones
+│       ├── docker-compose.yml      # Compose individual
+│       ├── tests/                  # Pruebas de grafo
+│       └── README.md
 │
-├── cassandra_db/               # Módulo Cassandra (Series Temporales)
-│   ├── schema.cql              # Esquema de tablas CQL
-│   ├── init_schema.py          # Script de creación de keyspace/tablas
-│   ├── connection.py           # Conexión con cassandra-driver
-│   ├── crud.py                 # Demo CRUD estándar en consola
-│   ├── load_listens.py         # Carga masiva optimizada
-│   ├── queries.py              # Consultas de series temporales
-│   └── README.md
+├── airflow/                        # 📁 Orquestación (Ana María)
+│   └── dags/
+│       └── music_dna_dag.py
 │
-├── neo4j/                      # Módulo Neo4j (Grafo de Relaciones)
-│   ├── compose.yaml            # Compose aislado de Neo4j
-│   ├── database.py             # Conexión con driver Neo4j
-│   ├── load.py                 # Carga de nodos y relaciones
-│   ├── analyze.py              # Algoritmos de grafo y comunidades
-│   ├── main.py                 # Consultas y CRUD
-│   ├── graph/                  # Implementación de queries y CRUD en Cypher
-│   └── README.md
+├── dashboard/                      # 📁 Dashboard Analítico (Streamlit)
+│   └── app.py
 │
-├── docs/                       # Guías, PDFs oficiales y documentación
-│   ├── Instrucciones Proyecto Grupal II.pdf
-│   ├── dataset.md
-│   ├── gcp.md
-│   ├── neo4j-results.md
-│   └── mongodb_crud_guide.md
-│
-└── scripts/                    # Scripts de utilidad común (descarga, validación)
+├── docs/                           # Documentación técnica y consignas oficiales
+└── scripts/                        # Descarga y verificación del dataset oficial
 ```
+
+---
+
+## 📚 Documentación Técnica
+
+| Documento | Descripción |
+| :--- | :--- |
+| [Dataset y Esquema](docs/dataset.md) | Origen, campos JSON y validación del dump oficial |
+| [MongoDB](docs/mongodb.md) | Modelo documental, índices y guía CRUD |
+| [Apache Cassandra](docs/cassandra.md) | Modelo de series temporales, particionamiento y consultas CQL |
+| [Neo4j](docs/neo4j.md) | Grafo de relaciones, comunidades e indicadores |
+| [Almacenamiento en GCP](docs/gcp.md) | Guía de configuración para Google Cloud Storage |
+| [Rúbrica Oficial](docs/Instrucciones%20Proyecto%20Grupal%20II.pdf) | Requisitos y entregables del curso |
 
 ---
 

@@ -174,6 +174,19 @@ big-data-2/
 
 ---
 
+## 📚 Documentación Técnica
+
+| Documento | Descripción |
+| :--- | :--- |
+| [Dataset y Esquema](docs/dataset.md) | Origen, campos JSON y validación del dump oficial |
+| [MongoDB](docs/mongodb.md) | Modelo documental, índices y guía CRUD |
+| [Apache Cassandra](docs/cassandra.md) | Modelo de series temporales, particionamiento y consultas CQL |
+| [Neo4j](docs/neo4j.md) | Grafo de relaciones, comunidades e indicadores |
+| [Almacenamiento en GCP](docs/gcp.md) | Guía de configuración para Google Cloud Storage |
+| [Rúbrica Oficial](docs/Instrucciones%20Proyecto%20Grupal%20II.pdf) | Requisitos y entregables del curso |
+
+---
+
 ## 🔜 Próximas Etapas
 
 - **Automatización (Apache Airflow):** DAG de 6 tareas (Extracción, Validación, Carga MongoDB, Carga Cassandra, Carga Neo4j, Cálculo de KPIs).

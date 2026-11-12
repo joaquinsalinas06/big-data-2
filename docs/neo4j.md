@@ -69,14 +69,15 @@ Radiohead aparece con coeficiente puente **0,634146**, que describe la distribuc
 
 ## Evidencia y reproducción
 
-- Las pruebas actuales están en `neo4j/tests/`: validación, agregación, Jaccard, diversidad, análisis vacío, carga repetida, consultas, publicación atómica y CRUD. La carga interrumpida se repite desde el inicio, sin checkpoints.
+- Las pruebas unitarias están en `databases/neo4j/tests/`: validación, agregación, Jaccard, diversidad, análisis vacío, carga repetida, consultas, publicación atómica y CRUD. La carga interrumpida se repite desde el inicio, sin checkpoints.
 - Aceptación del lote completo: reconciliación, cobertura independiente en Neo4j, exclusión de canciones/artistas escuchados, explicación del puntaje y consultas de la semana 12.
 - Datos conservados después de recrear y reiniciar el contenedor; volumen persistente.
 - Artefactos detallados locales: `data/neo4j/analysis.json` y registros de pruebas. Los archivos antiguos de aceptación son históricos, no comandos vigentes. Permanecen fuera de Git.
 
 ```bash
-python neo4j/main.py
-NEO4J_INTEGRATION=1 python -m unittest discover -s neo4j/tests -v
+python -m databases.neo4j.crud --pause
+python -m databases.neo4j.queries
+pytest databases/neo4j/tests
 ```
 
-La organización vigente está en [neo4j/README.md](../neo4j/README.md). Los tiempos anteriores pertenecen a la ejecución inicial; la reorganización conserva los cálculos. Windows y Linux no se ejecutaron en esta sesión. Dashboard, Airflow, MongoDB, Cassandra y GCP siguen pendientes. No se ha medido precisión predictiva mediante un conjunto reservado.
+La organización vigente está en [databases/neo4j/README.md](../databases/neo4j/README.md). Los tiempos anteriores pertenecen a la ejecución inicial; la reorganización conserva los cálculos.

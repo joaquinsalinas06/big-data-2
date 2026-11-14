@@ -21,6 +21,14 @@
 \usepackage{tikz}
 \usetikzlibrary{arrows.meta,positioning,fit,babel}
 \usepackage{caption}
+\usepackage[titles]{tocloft}
+
+% Más espacio para los números del índice (las secciones 10 y 11 tienen dos cifras)
+\setlength{\cftsecnumwidth}{2em}
+\setlength{\cftsubsecindent}{2em}
+\setlength{\cftsubsecnumwidth}{2.8em}
+\setlength{\cftsubsubsecindent}{4.8em}
+\setlength{\cftsubsubsecnumwidth}{3.6em}
 
 % En la fuente de código, >> y -- deben verse tal cual y no como comillas o guiones largos
 \DisableLigatures[<,>,-]{encoding = T1, family = tt*}

@@ -145,7 +145,7 @@ Neo4j & Nada después de la primera carga completa & 1 \\
 \end{tabularx}
 \end{table}
 
-Para que MongoDB fuera incremental hubo que corregir \code{load_to_mongodb}, como se explica en la sección~\ref{cap:mongodb}: el total objetivo pasó a ser lo que ya hay en la colección más \code{limit}. En Cassandra el id de cada lote es \code{listens_full.jsonl:<primera línea>-<última línea>}, por eso el tamaño de lote tiene que ser siempre el mismo; si cambiara, los ids no coincidirían con los ya registrados y los agregados contarían dos veces.
+Para que MongoDB fuera incremental hubo que corregir \code{load_to_mongodb}, como se explica en la sección~\ref{cap:mongodb}: el total objetivo pasó a ser lo que ya hay en la colección más \code{limit}. En Cassandra el id de cada lote es \code{listens_full.jsonl:<inicio>-<fin>}, donde \code{inicio} y \code{fin} son la primera y la última línea del lote; por eso el tamaño de lote tiene que ser siempre el mismo; si cambiara, los ids no coincidirían con los ya registrados y los agregados contarían dos veces.
 
 Como los KPIs se recalculan en cada corrida con lo que hay en las bases, cambian a medida que crece Cassandra. Cuando se terminan los lotes, las corridas siguen funcionando, pero los valores se estabilizan.
 

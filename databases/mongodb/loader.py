@@ -11,6 +11,8 @@ from pymongo.errors import PyMongoError
 from databases.mongodb.connection import get_client, get_collection, ensure_indexes
 from databases.mongodb.app.services.import_service import import_file
 
+MAX_TARGET = 4_000_000  # tope que acepta process_file
+
 
 def load_to_mongodb(
     source_path: Path | str,
@@ -35,6 +37,10 @@ def load_to_mongodb(
         collection = get_collection(client)
         ensure_indexes(collection)
 
+        # El target es absoluto (total de documentos en la colección), así que se suma lo que ya hay
+        # para que cada corrida agregue hasta `limit` documentos nuevos.
+        target = min(collection.count_documents({}) + limit, MAX_TARGET)
+
         print(f"Iniciando carga a MongoDB desde {source} (límite: {limit}, lote: {batch_size})...")
         result = import_file(
             collection=collection,
@@ -42,7 +48,7 @@ def load_to_mongodb(
             state_path=state_path,
             limit=limit,
             batch_size=batch_size,
-            target=limit,
+            target=target,
             dry_run=dry_run,
             progress=progress,
         )

@@ -28,10 +28,15 @@ docker compose up -d
 # docker compose up -d neo4j
 ```
 
+`docker compose up -d` también construye y levanta Airflow (postgres, airflow-init, webserver y scheduler). La primera vez conviene correr antes `docker compose build`. Docker necesita unos 10 GB de memoria para todo el stack.
+
 Puertos asignados:
 - **MongoDB:** `27017`
 - **Cassandra:** `9042`
 - **Neo4j:** `7474` (HTTP / Browser), `7687` (Bolt)
+- **Airflow:** `8080` (http://localhost:8080, usuario `admin`, clave `admin`)
+
+El DAG `music_dna_pipeline` aparece pausado; se activa desde la interfaz o se corre completo con `docker compose exec airflow-scheduler airflow dags test music_dna_pipeline`. Detalle en [docs/airflow.md](docs/airflow.md).
 
 ---
 
@@ -182,6 +187,7 @@ big-data-2/
 | [MongoDB](docs/mongodb.md) | Modelo documental, índices y guía CRUD |
 | [Apache Cassandra](docs/cassandra.md) | Modelo de series temporales, particionamiento y consultas CQL |
 | [Neo4j](docs/neo4j.md) | Grafo de relaciones, comunidades e indicadores |
+| [Airflow](docs/airflow.md) | DAG del pipeline, carga incremental y fórmulas de los KPIs |
 | [Almacenamiento en GCP](docs/gcp.md) | Guía de configuración para Google Cloud Storage |
 | [Rúbrica Oficial](docs/Instrucciones%20Proyecto%20Grupal%20II.pdf) | Requisitos y entregables del curso |
 
@@ -189,6 +195,6 @@ big-data-2/
 
 ## 🔜 Próximas Etapas
 
-- **Automatización (Apache Airflow):** DAG de 6 tareas (Extracción, Validación, Carga MongoDB, Carga Cassandra, Carga Neo4j, Cálculo de KPIs).
+- [x] **Automatización (Apache Airflow):** DAG de 6 tareas (Extracción, Validación, Carga MongoDB, Carga Cassandra, Carga Neo4j, Cálculo de KPIs). Ver [docs/airflow.md](docs/airflow.md).
 - **Dashboard Analítico (Streamlit):** Visualización interactiva conectando los 3 almacenes y los 5 KPIs.
 - **Informe Técnico & Video Demostrativo:** Documentación en PDF y grabación de 20-25 minutos.

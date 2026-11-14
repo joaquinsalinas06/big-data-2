@@ -1,0 +1,96 @@
+\section{KPIs implementados}
+\label{cap:kpis}
+
+Definimos cinco indicadores. Los cuatro primeros salen de las tablas agregadas de Cassandra y el quinto del grafo de Neo4j. Los calcula la tarea \code{generar_kpis} del DAG en cada corrida (sección~\ref{cap:airflow}), así que se actualizan a medida que se cargan lotes nuevos.
+
+\subsection{Día de referencia}
+
+Los indicadores diarios se calculan sobre un día de referencia $d^{*}$, que es el penúltimo día de la tabla \code{daily_stats}. El último día se descarta porque el volcado se cortó el 27 de octubre de 2026 a las 00:01 y ese día tiene solo 4 escuchas: usarlo daría un crecimiento de $-100\,\%$ que no dice nada sobre los usuarios. El mes de referencia $m^{*}$ es el mes de $d^{*}$.
+
+En las fórmulas, $E(d)$ es la cantidad de escuchas con fecha $d$ (en UTC) y $U(d)$ la cantidad de usuarios distintos con al menos una escucha ese día. Ambos valores están precalculados en \code{daily_stats}.
+
+Hay que leer todos los valores con una advertencia: el dataset es un lote de ingesta. Los indicadores describen lo que los usuarios enviaron a ListenBrainz en ese periodo, no la popularidad general de los artistas ni el comportamiento de toda la plataforma.
+
+\subsection{KPI 1: escuchas procesadas por día}
+
+\textit{Definición.} Cantidad de escuchas cargadas con fecha igual al día de referencia.
+
+\textit{Fórmula.}
+\[
+\text{KPI}_1 = E(d^{*})
+\]
+
+\textit{Interpretación.} Mide el volumen que procesa el pipeline. Una caída fuerte respecto a los días anteriores indica un día con menos datos de lo normal, por ejemplo un corte del volcado o una falla de la fuente. Con el archivo completo cargado, el 26 de octubre tiene 1\,359\,824 escuchas, el 28~\% de todo el dataset, lo que muestra cuánto se concentra la ingesta en los últimos días del incremental.
+
+\subsection{KPI 2: crecimiento diario de escuchas}
+
+\textit{Definición.} Variación porcentual de las escuchas del día de referencia respecto al día anterior.
+
+\textit{Fórmula.}
+\[
+\text{KPI}_2 = \frac{E(d^{*}) - E(d^{*}-1)}{E(d^{*}-1)} \times 100
+\]
+El valor queda vacío si $E(d^{*}-1) = 0$.
+
+\textit{Interpretación.} Muestra la tendencia de corto plazo. En este dataset tiene saltos muy grandes: con el archivo completo, el 26 de octubre crece $+3\,364\,\%$ respecto al día anterior. Un salto así refleja un cambio en la ingesta (muchos usuarios enviando su historial en esos días), no que la gente haya escuchado treinta veces más música.
+
+\subsection{KPI 3: escuchas promedio por usuario activo}
+
+\textit{Definición.} Promedio de escuchas de los usuarios que escucharon algo el día de referencia.
+
+\textit{Fórmula.}
+\[
+\text{KPI}_3 = \frac{E(d^{*})}{U(d^{*})}
+\]
+
+\textit{Interpretación.} Separa intensidad de alcance. Si suben las escuchas pero no los usuarios activos, los mismos usuarios están escuchando más; si suben ambos en la misma proporción, hay más usuarios con un comportamiento parecido. Con el archivo completo, el 26 de octubre tiene 1\,359\,824 escuchas de 26\,020 usuarios, unas 52,3 escuchas por usuario activo.
+
+\subsection{KPI 4: participación del artista líder del mes}
+
+\textit{Definición.} Porcentaje de las escuchas del mes de referencia que corresponde al artista más escuchado de ese mes.
+
+\textit{Fórmula.} Si $E_{a}(m)$ son las escuchas del artista $a$ en el mes $m$ y $a_1$ es el artista en el primer puesto del ranking:
+\[
+\text{KPI}_4 = \frac{E_{a_1}(m^{*})}{\sum_{a} E_{a}(m^{*})} \times 100
+\]
+El valor se lee de \code{share_pct} en la fila con \code{rank = 1} de \code{top_artists_by_month}, que se calcula al cargar sobre todas las escuchas del mes.
+
+\textit{Interpretación.} Mide concentración. Un valor alto indica que un solo artista domina la escucha del mes; uno bajo, que la escucha está repartida entre muchos artistas. Con el archivo completo, BTS concentra el 12,65~\% de las escuchas de octubre de 2026, un valor alto si se considera que el lote tiene 286\,291 nombres de artista distintos.
+
+\subsection{KPI 5: entidad con más conexiones en el grafo}
+
+\textit{Definición.} Artista con más usuarios distintos conectados a él en el grafo, es decir, con más oyentes.
+
+\textit{Fórmula.} Si $C(a)$ es la cantidad de usuarios con una relación \code{ESCUCHA_ARTISTA} hacia el artista $a$:
+\[
+C(a) = \left|\{\, u : (u)\text{-[:ESCUCHA\_ARTISTA]}\rightarrow(a) \,\}\right|, \qquad \text{KPI}_5 = \max_{a} C(a)
+\]
+El indicador reporta el artista que alcanza el máximo y su valor $C(a)$. Se obtiene con la consulta de artistas con más oyentes del módulo de Neo4j.
+
+\textit{Interpretación.} Es el grado de entrada del artista en el grafo usuario--artista: cuántos usuarios distintos lo escuchan, sin importar cuántas veces. Mide alcance y no volumen, y por eso complementa al KPI 4: un artista puede tener muchas escuchas concentradas en pocos fans y otro, menos escuchas repartidas entre mucha gente.
+
+\subsection{Métricas de seguimiento}
+
+Además de los cinco KPIs, cada snapshot guarda métricas que sirven para seguir el estado del pipeline: el total acumulado de documentos en MongoDB y los insertados en la corrida, los lotes y escuchas cargados en Cassandra, los usuarios, canciones y escuchas del grafo, y los indicadores del análisis de Neo4j (cantidad de comunidades, modularidad y cobertura de recomendaciones). El total acumulado en MongoDB y los lotes de Cassandra permiten ver en el dashboard cómo crece la carga incremental de una corrida a otra.
+
+\subsection{Formato del snapshot}
+
+El snapshot tiene la misma forma en \code{data/airflow/kpis_latest.json} y en cada documento de la colección \code{kpi_runs}, pensada para que el dashboard la lea sin transformarla:
+
+\begin{table}[H]
+\centering
+\caption{Campos del snapshot de KPIs}
+\label{tab:snapshot}
+\begin{tabularx}{\textwidth}{l Y}
+\toprule
+Campo & Contenido \\
+\midrule
+\code{run_id}, \code{fecha_logica}, \code{generado_en} & Identificador de la corrida de Airflow, su fecha lógica y el momento en que se generó \\
+\code{dia_referencia}, \code{mes_referencia} & Día $d^{*}$ y mes $m^{*}$ usados en los cálculos \\
+\code{kpis} & Un objeto por indicador con \code{nombre}, \code{valor}, \code{unidad} y \code{fuente}, más los datos propios de cada uno (artista, mes, usuarios activos) \\
+\code{seguimiento} & Las métricas de seguimiento descritas arriba \\
+\code{serie_diaria} & Los últimos 30 días del año de referencia con escuchas, usuarios activos, escuchas por usuario y crecimiento, para graficar la tendencia \\
+\bottomrule
+\end{tabularx}
+\nota{En \code{kpi_runs} el \code{_id} de cada documento es el \code{run_id}, de modo que un reintento de la tarea reemplaza el snapshot en lugar de duplicarlo.}
+\end{table}

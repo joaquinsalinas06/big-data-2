@@ -5,7 +5,7 @@ Definimos cinco indicadores. Los cuatro primeros salen de las tablas agregadas d
 
 \subsection{Día de referencia}
 
-Los indicadores diarios se calculan sobre un día de referencia $d^{*}$, que es el penúltimo día de la tabla \code{daily_stats}. El último día se descarta porque el volcado se cortó el 27 de octubre de 2026 a las 00:01 y ese día tiene solo 4 escuchas: usarlo daría un crecimiento de $-100\,\%$ que no dice nada sobre los usuarios. El mes de referencia $m^{*}$ es el mes de $d^{*}$.
+Los indicadores diarios se calculan sobre un día de referencia $d^{*}$, que es el penúltimo día de la tabla \code{daily_stats}. El último día se descarta porque el volcado se cortó el 27 de octubre de 2026 a las 00:01 y ese día tiene solo 4 escuchas: usarlo daría un crecimiento de $-100$~\% que no dice nada sobre los usuarios. El mes de referencia $m^{*}$ es el mes de $d^{*}$.
 
 En las fórmulas, $E(d)$ es la cantidad de escuchas con fecha $d$ (en UTC) y $U(d)$ la cantidad de usuarios distintos con al menos una escucha ese día. Ambos valores están precalculados en \code{daily_stats}.
 
@@ -32,7 +32,7 @@ Hay que leer todos los valores con una advertencia: el dataset es un lote de ing
 \]
 El valor queda vacío si $E(d^{*}-1) = 0$.
 
-\textit{Interpretación.} Muestra la tendencia de corto plazo. En este dataset tiene saltos muy grandes: con el archivo completo, el 26 de octubre crece $+3\,364\,\%$ respecto al día anterior. Un salto así refleja un cambio en la ingesta (muchos usuarios enviando su historial en esos días), no que la gente haya escuchado treinta veces más música.
+\textit{Interpretación.} Muestra la tendencia de corto plazo. En este dataset tiene saltos muy grandes: con el archivo completo, el 26 de octubre crece $+3\,364$~\% respecto al día anterior. Un salto así refleja un cambio en la ingesta (muchos usuarios enviando su historial en esos días), no que la gente haya escuchado treinta veces más música.
 
 \subsection{KPI 3: escuchas promedio por usuario activo}
 

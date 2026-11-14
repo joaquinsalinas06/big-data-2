@@ -17,6 +17,16 @@ airflow/logs/*
 airflow/plugins/*
 !airflow/plugins/.gitkeep
 
+# LaTeX: archivos auxiliares y PDF compilado del informe
+*.aux
+*.log
+*.out
+*.toc
+*.fls
+*.fdb_latexmk
+*.synctex.gz
+informe/main.pdf
+
 # Python y sistema
 __pycache__/
 *.py[cod]

@@ -1,0 +1,182 @@
+\documentclass[11pt,a4paper,openany]{report}
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage[spanish,es-noshorthands,es-tabla]{babel}
+\usepackage[margin=2.5cm]{geometry}
+\usepackage{graphicx}
+\usepackage{float}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{array}
+\usepackage{tabularx}
+\usepackage{amsmath}
+\usepackage{xcolor}
+\usepackage{listings}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,positioning,fit,babel}
+\usepackage{titlesec}
+\usepackage{xurl}
+\usepackage[hidelinks]{hyperref}
+
+% Capítulos con encabezado compacto
+\titleformat{\chapter}[hang]{\Large\bfseries}{\thechapter.}{0.6em}{}
+\titlespacing*{\chapter}{0pt}{0pt}{1.2em}
+
+% Identificadores de código en el texto: se cortan en cualquier carácter si no entran en la línea
+\urlstyle{tt}
+\DeclareUrlCommand\code{\urlstyle{tt}}
+
+\setlength{\parskip}{0.4em}
+\renewcommand{\arraystretch}{1.15}
+\newcolumntype{Y}{>{\raggedright\arraybackslash}X}
+
+% Estilos de código pensados para leerse también impresos en blanco y negro
+\lstset{
+  basicstyle=\ttfamily\footnotesize,
+  keywordstyle=\bfseries,
+  commentstyle=\itshape\color{black!65},
+  stringstyle=\color{black!80},
+  showstringspaces=false,
+  breaklines=true,
+  breakatwhitespace=false,
+  columns=fullflexible,
+  keepspaces=true,
+  frame=single,
+  rulecolor=\color{black!40},
+  framesep=4pt,
+  xleftmargin=6pt,
+  xrightmargin=6pt,
+  aboveskip=0.8em,
+  belowskip=0.8em,
+  captionpos=b,
+  tabsize=4,
+  upquote=true,
+  literate=
+    {á}{{\'a}}1 {é}{{\'e}}1 {í}{{\'i}}1 {ó}{{\'o}}1 {ú}{{\'u}}1
+    {Á}{{\'A}}1 {É}{{\'E}}1 {Í}{{\'I}}1 {Ó}{{\'O}}1 {Ú}{{\'U}}1
+    {ñ}{{\~n}}1 {Ñ}{{\~N}}1 {ü}{{\"u}}1 {ö}{{\"o}}1
+    {¿}{{\textquestiondown}}1 {¡}{{\textexclamdown}}1
+}
+
+\lstdefinelanguage{CQL}{
+  morekeywords={CREATE,TABLE,KEYSPACE,IF,NOT,EXISTS,WITH,PRIMARY,KEY,CLUSTERING,ORDER,BY,
+    ASC,DESC,SELECT,FROM,WHERE,AND,INSERT,INTO,VALUES,UPDATE,SET,DELETE,LIMIT,
+    bigint,text,timestamp,uuid,int,double,date,replication},
+  sensitive=false,
+  morecomment=[l]{--},
+  morestring=[b]',
+}
+
+\lstdefinelanguage{Cypher}{
+  morekeywords={MATCH,OPTIONAL,MERGE,CREATE,SET,DELETE,DETACH,RETURN,WHERE,WITH,UNWIND,AS,
+    ORDER,BY,DESC,LIMIT,AND,NOT,EXISTS,ON,CONSTRAINT,FOR,REQUIRE,IS,UNIQUE,DISTINCT,
+    count,sum,collect},
+  sensitive=false,
+  morecomment=[l]{//},
+  morestring=[b]',
+  morestring=[b]",
+}
+
+\lstdefinelanguage{JSON}{
+  morestring=[b]",
+}
+
+\addto\captionsspanish{\renewcommand{\bibname}{Referencias}}
+
+\hypersetup{
+  pdftitle={Music DNA: arquitectura multimodelo para el análisis de escuchas de ListenBrainz},
+  pdfauthor={Accilio, Cabezas, Gálvez, Meneses, Salinas},
+}
+
+\begin{document}
+
+\begin{titlepage}
+  \centering
+  {\large Universidad de Ingeniería y Tecnología (UTEC)\par}
+  \vspace{0.3cm}
+  {\large Facultad de Computación -- Ciencias de la Computación\par}
+  \vspace{2.5cm}
+  {\Large Big Data\par}
+  \vspace{0.4cm}
+  {\Large Proyecto Grupal II\par}
+  \vspace{2cm}
+  \rule{\textwidth}{0.6pt}\par
+  \vspace{0.5cm}
+  {\LARGE\bfseries Music DNA: arquitectura multimodelo para el análisis de escuchas de ListenBrainz\par}
+  \vspace{0.4cm}
+  \rule{\textwidth}{0.6pt}\par
+  \vspace{2.5cm}
+  {\large Integrantes\par}
+  \vspace{0.4cm}
+  {\large
+  Ana María Accilio\par
+  Dylan Cabezas\par
+  José Guillermo Gálvez\par
+  Matías Meneses\par
+  Joaquín Salinas\par}
+  \vfill
+  {\large Noviembre 2026\par}
+\end{titlepage}
+
+\tableofcontents
+
+\input{capitulos/01_introduccion}
+\input{capitulos/02_problema}
+\input{capitulos/03_arquitectura}
+\input{capitulos/04_dataset}
+\input{capitulos/05_mongodb}
+\input{capitulos/06_cassandra}
+\input{capitulos/07_neo4j}
+\input{capitulos/08_airflow}
+\input{capitulos/09_kpis}
+\input{capitulos/10_dashboard}
+\input{capitulos/11_conclusiones}
+
+\begin{thebibliography}{99}
+\addcontentsline{toc}{chapter}{Referencias}
+
+\bibitem{listenbrainz-data}
+MetaBrainz Foundation. \emph{ListenBrainz -- Data Downloads}.
+\url{https://listenbrainz.org/data/}
+
+\bibitem{listenbrainz-dumps}
+MetaBrainz Foundation. \emph{ListenBrainz Data Dumps}. Documentación de ListenBrainz.
+\url{https://listenbrainz.readthedocs.io/en/latest/users/listenbrainz-dumps.html}
+
+\bibitem{listenbrainz-json}
+MetaBrainz Foundation. \emph{ListenBrainz JSON Documentation}.
+\url{https://listenbrainz.readthedocs.io/en/latest/users/json.html}
+
+\bibitem{incremental-2746}
+MetaBrainz Foundation. Directorio del incremental 2746 (27 de octubre de 2026).
+\url{https://data.metabrainz.org/pub/musicbrainz/listenbrainz/incremental/listenbrainz-dump-2746-20261027-000003-incremental/}
+
+\bibitem{mongodb}
+MongoDB, Inc. \emph{MongoDB Manual}.
+\url{https://www.mongodb.com/docs/manual/}
+
+\bibitem{cassandra}
+The Apache Software Foundation. \emph{Apache Cassandra Documentation}.
+\url{https://cassandra.apache.org/doc/latest/}
+
+\bibitem{neo4j}
+Neo4j, Inc. \emph{Neo4j Cypher Manual}.
+\url{https://neo4j.com/docs/cypher-manual/current/}
+
+\bibitem{airflow}
+The Apache Software Foundation. \emph{Apache Airflow Documentation}, versión 2.10.
+\url{https://airflow.apache.org/docs/apache-airflow/2.10.5/}
+
+\bibitem{streamlit}
+Snowflake Inc. \emph{Streamlit Documentation}.
+\url{https://docs.streamlit.io/}
+
+\bibitem{networkx}
+NetworkX Developers. \emph{NetworkX: Louvain Community Detection}.
+\url{https://networkx.org/documentation/stable/reference/algorithms/generated/networkx.algorithms.community.louvain.louvain_communities.html}
+
+\end{thebibliography}
+
+\end{document}

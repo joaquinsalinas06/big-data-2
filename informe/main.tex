@@ -1,32 +1,42 @@
-\documentclass[11pt,a4paper,openany]{report}
+\documentclass[11pt,a4paper]{article}
 
-\usepackage[utf8]{inputenc}
 \usepackage[T1]{fontenc}
-\usepackage{lmodern}
+\usepackage[utf8]{inputenc}
 \usepackage[spanish,es-noshorthands,es-tabla]{babel}
-\usepackage[margin=2.5cm]{geometry}
+\usepackage{amsmath,amssymb}
 \usepackage{graphicx}
-\usepackage{float}
+\usepackage{url}
+\usepackage[hidelinks]{hyperref}
+\usepackage{lmodern}
 \usepackage{booktabs}
-\usepackage{longtable}
 \usepackage{array}
+\usepackage{natbib}
+\usepackage{microtype}
+\usepackage[margin=2.5cm]{geometry}
+\usepackage{float}
+\usepackage{longtable}
 \usepackage{tabularx}
-\usepackage{amsmath}
 \usepackage{xcolor}
 \usepackage{listings}
 \usepackage{tikz}
 \usetikzlibrary{arrows.meta,positioning,fit,babel}
-\usepackage{titlesec}
-\usepackage{xurl}
-\usepackage[hidelinks]{hyperref}
+\usepackage{caption}
 
-% Capítulos con encabezado compacto
-\titleformat{\chapter}[hang]{\Large\bfseries}{\thechapter.}{0.6em}{}
-\titlespacing*{\chapter}{0pt}{0pt}{1.2em}
+\setcitestyle{authoryear,round,aysep={,},yysep={;}}
+\renewcommand{\bibfont}{\normalsize\raggedright}
+\setlength{\bibhang}{0.5in}
+\setlength{\bibsep}{0pt}
+
+% Tablas y figuras como en la plantilla: "Tabla N" en negrita arriba a la izquierda
+% y en la línea siguiente el título en cursiva.
+\captionsetup{labelfont=bf, textfont=it, labelsep=newline, justification=raggedright,
+  singlelinecheck=false, skip=4pt}
+\captionsetup[table]{position=top}
+\captionsetup[figure]{position=top}
+\newcommand{\nota}[1]{\par\smallskip{\raggedright\small\textit{Nota.} #1\par}}
 
 % Identificadores de código en el texto. Funciona también dentro de tablas y leyendas,
 % y permite cortar la línea después de _ y de / cuando el nombre es largo.
-\urlstyle{tt}
 \ExplSyntaxOn
 \tl_new:N \l__informe_code_tl
 \cs_generate_variant:Nn \tl_replace_all:Nnn { NVn }
@@ -61,7 +71,6 @@
   xrightmargin=6pt,
   aboveskip=0.8em,
   belowskip=0.8em,
-  captionpos=b,
   tabsize=4,
   upquote=true,
   literate=
@@ -94,44 +103,89 @@
   morestring=[b]",
 }
 
-\addto\captionsspanish{\renewcommand{\bibname}{Referencias}}
+\newcommand{\Universidad}{UNIVERSIDAD DE INGENIERÍA Y TECNOLOGÍA}
+\newcommand{\Carrera}{Facultad de Computación - Ciencias de la Computación}
+
+\newcommand{\TituloTrabajo}{Music DNA: arquitectura multimodelo para el análisis de escuchas de ListenBrainz}
+
+\newcommand{\autores}{%
+Accilio Villanueva, Ana Maria - 202120050\\{}
+[Apellidos, Nombres de Dylan - código]\\{}
+[Apellidos, Nombres de Guille - código]\\{}
+[Apellidos, Nombres de Matías - código]\\{}
+[Apellidos, Nombres de Salinas - código]}
+
+\newcommand{\Profesor}{[Apellidos, Nombres del profesor]}
+\newcommand{\Curso}{Big Data ([código del curso])}
+\newcommand{\Grupo}{[número]}
+
+\newcommand{\FechaEntrega}{17 de noviembre de 2026}
+
+\newcommand{\LogoFile}{figuras/utec_logo.jpg}
 
 \hypersetup{
   pdftitle={Music DNA: arquitectura multimodelo para el análisis de escuchas de ListenBrainz},
-  pdfauthor={Accilio, Cabezas, Gálvez, Meneses, Salinas},
 }
 
 \begin{document}
+\raggedbottom
 
 \begin{titlepage}
-  \centering
-  {\large Universidad de Ingeniería y Tecnología (UTEC)\par}
-  \vspace{0.3cm}
-  {\large Facultad de Computación -- Ciencias de la Computación\par}
-  \vspace{2.5cm}
-  {\Large Big Data\par}
-  \vspace{0.4cm}
-  {\Large Proyecto Grupal II\par}
-  \vspace{2cm}
-  \rule{\textwidth}{0.6pt}\par
-  \vspace{0.5cm}
-  {\LARGE\bfseries Music DNA: arquitectura multimodelo para el análisis de escuchas de ListenBrainz\par}
-  \vspace{0.4cm}
-  \rule{\textwidth}{0.6pt}\par
-  \vspace{2.5cm}
-  {\large Integrantes\par}
-  \vspace{0.4cm}
-  {\large
-  Ana María Accilio\par
-  Dylan Cabezas\par
-  José Guillermo Gálvez\par
-  Matías Meneses\par
-  Joaquín Salinas\par}
-  \vfill
-  {\large Noviembre 2026\par}
+    \centering
+    \vspace*{0.9cm}
+
+    {\large\textbf{\Universidad}\par}
+    \vspace{0.30cm}
+    {\normalsize\Carrera\par}
+
+    \vspace{0.9cm}
+
+    \IfFileExists{\LogoFile}{%
+        \includegraphics[width=0.24\textwidth]{\LogoFile}\par
+    }{%
+        \vspace{2.4cm}
+    }
+
+    \vspace{1.0cm}
+
+    {\Large\textbf{\TituloTrabajo}\par}
+
+    \vspace{1.0cm}
+
+    {\normalsize\textbf{Proyecto Grupal II}\par}
+
+    \vspace{0.85cm}
+
+    {\normalsize\textbf{AUTORES}\par}
+    \vspace{0.25cm}
+    {\normalsize\autores\par}
+
+    \vspace{0.75cm}
+
+    {\normalsize\textbf{PROFESOR}\par}
+    \vspace{0.20cm}
+    {\normalsize\Profesor\par}
+
+    \vspace{0.65cm}
+
+    {\normalsize\textbf{CURSO}\par}
+    \vspace{0.20cm}
+    {\normalsize\Curso\par}
+
+    \vspace{0.65cm}
+
+    {\normalsize\textbf{GRUPO}\par}
+    \vspace{0.20cm}
+    {\normalsize\Grupo\par}
+
+    \vfill
+
+    {\normalsize Lima, Perú\par}
+    {\normalsize\FechaEntrega\par}
 \end{titlepage}
 
 \tableofcontents
+\clearpage
 
 \input{capitulos/01_introduccion}
 \input{capitulos/02_problema}
@@ -145,48 +199,79 @@
 \input{capitulos/10_dashboard}
 \input{capitulos/11_conclusiones}
 
+\clearpage
+\renewcommand{\refname}{Referencias}
+\phantomsection
+\addcontentsline{toc}{section}{Referencias}
+
 \begin{thebibliography}{99}
-\addcontentsline{toc}{chapter}{Referencias}
 
-\bibitem{listenbrainz-data}
-MetaBrainz Foundation. \emph{ListenBrainz -- Data Downloads}.
-\url{https://listenbrainz.org/data/}
+\bibitem[Blondel et al.(2008)]{blondel2008}
+Blondel, V. D., Guillaume, J.-L., Lambiotte, R., \& Lefebvre, E. (2008).
+Fast unfolding of communities in large networks.
+\textit{Journal of Statistical Mechanics: Theory and Experiment, 2008}(10), P10008.
+\newline
+\url{https://doi.org/10.1088/1742-5468/2008/10/P10008}
 
-\bibitem{listenbrainz-dumps}
-MetaBrainz Foundation. \emph{ListenBrainz Data Dumps}. Documentación de ListenBrainz.
-\url{https://listenbrainz.readthedocs.io/en/latest/users/listenbrainz-dumps.html}
-
-\bibitem{listenbrainz-json}
-MetaBrainz Foundation. \emph{ListenBrainz JSON Documentation}.
-\url{https://listenbrainz.readthedocs.io/en/latest/users/json.html}
-
-\bibitem{incremental-2746}
-MetaBrainz Foundation. Directorio del incremental 2746 (27 de octubre de 2026).
+\bibitem[{MetaBrainz Foundation}(2026)]{incremental2746}
+MetaBrainz Foundation. (2026).
+\textit{ListenBrainz listens dump 2746, incremental del 27 de octubre de 2026} [Conjunto de datos].
+\newline
 \url{https://data.metabrainz.org/pub/musicbrainz/listenbrainz/incremental/listenbrainz-dump-2746-20261027-000003-incremental/}
 
-\bibitem{mongodb}
-MongoDB, Inc. \emph{MongoDB Manual}.
+\bibitem[{MetaBrainz Foundation}(s.f.-a)]{listenbrainzdata}
+MetaBrainz Foundation. (s.f.-a).
+\textit{Data downloads}. ListenBrainz. Recuperado el 14 de noviembre de 2026.
+\newline
+\url{https://listenbrainz.org/data/}
+
+\bibitem[{MetaBrainz Foundation}(s.f.-b)]{listenbrainzdumps}
+MetaBrainz Foundation. (s.f.-b).
+\textit{ListenBrainz data dumps}. Documentación de ListenBrainz. Recuperado el 14 de noviembre de 2026.
+\newline
+\url{https://listenbrainz.readthedocs.io/en/latest/users/listenbrainz-dumps.html}
+
+\bibitem[{MetaBrainz Foundation}(s.f.-c)]{listenbrainzjson}
+MetaBrainz Foundation. (s.f.-c).
+\textit{ListenBrainz JSON documentation}. Documentación de ListenBrainz. Recuperado el 14 de noviembre de 2026.
+\newline
+\url{https://listenbrainz.readthedocs.io/en/latest/users/json.html}
+
+\bibitem[{MongoDB, Inc.}(s.f.)]{mongodb}
+MongoDB, Inc. (s.f.).
+\textit{MongoDB manual}. Recuperado el 14 de noviembre de 2026.
+\newline
 \url{https://www.mongodb.com/docs/manual/}
 
-\bibitem{cassandra}
-The Apache Software Foundation. \emph{Apache Cassandra Documentation}.
-\url{https://cassandra.apache.org/doc/latest/}
-
-\bibitem{neo4j}
-Neo4j, Inc. \emph{Neo4j Cypher Manual}.
+\bibitem[{Neo4j, Inc.}(s.f.)]{neo4j}
+Neo4j, Inc. (s.f.).
+\textit{Cypher manual}. Recuperado el 14 de noviembre de 2026.
+\newline
 \url{https://neo4j.com/docs/cypher-manual/current/}
 
-\bibitem{airflow}
-The Apache Software Foundation. \emph{Apache Airflow Documentation}, versión 2.10.
-\url{https://airflow.apache.org/docs/apache-airflow/2.10.5/}
+\bibitem[{NetworkX Developers}(s.f.)]{networkx}
+NetworkX Developers. (s.f.).
+\textit{louvain\_communities}. Documentación de NetworkX. Recuperado el 14 de noviembre de 2026.
+\newline
+\url{https://networkx.org/documentation/stable/reference/algorithms/generated/networkx.algorithms.community.louvain.louvain_communities.html}
 
-\bibitem{streamlit}
-Snowflake Inc. \emph{Streamlit Documentation}.
+\bibitem[{Snowflake Inc.}(s.f.)]{streamlit}
+Snowflake Inc. (s.f.).
+\textit{Streamlit documentation}. Recuperado el 14 de noviembre de 2026.
+\newline
 \url{https://docs.streamlit.io/}
 
-\bibitem{networkx}
-NetworkX Developers. \emph{NetworkX: Louvain Community Detection}.
-\url{https://networkx.org/documentation/stable/reference/algorithms/generated/networkx.algorithms.community.louvain.louvain_communities.html}
+\bibitem[{The Apache Software Foundation}(s.f.-a)]{airflow}
+The Apache Software Foundation. (s.f.-a).
+\textit{Apache Airflow documentation} (versión 2.10.5). Recuperado el 14 de noviembre de 2026.
+\newline
+\url{https://airflow.apache.org/docs/apache-airflow/2.10.5/}
+
+\bibitem[{The Apache Software Foundation}(s.f.-b)]{cassandra}
+The Apache Software Foundation. (s.f.-b).
+\textit{Apache Cassandra documentation}. Recuperado el 14 de noviembre de 2026.
+\newline
+\url{https://cassandra.apache.org/doc/latest/}
 
 \end{thebibliography}
 

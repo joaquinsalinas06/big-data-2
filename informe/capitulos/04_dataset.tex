@@ -1,13 +1,13 @@
-\chapter{Descripción del dataset}
+\section{Descripción del dataset}
 \label{cap:dataset}
 
-\section{Origen}
+\subsection{Origen}
 
-ListenBrainz publica sus datos de escuchas en varios formatos~\cite{listenbrainz-dumps}: volcados completos (del orden de cientos de GB), volcados incrementales con las escuchas recibidas desde el incremental anterior y exportaciones orientadas a Spark. Elegimos un incremental porque cumple con holgura el mínimo de 50\,000 registros de la consigna, se descarga y procesa en una laptop y, al ser parte de una serie que se publica periódicamente, encaja con la idea de actualizaciones incrementales. Para que todo el grupo trabaje con la misma versión fijamos un incremental concreto~\cite{incremental-2746}. La tabla~\ref{tab:dataset} resume sus características.
+ListenBrainz publica sus datos de escuchas en varios formatos \citep{listenbrainzdumps}: volcados completos (del orden de cientos de GB), volcados incrementales con las escuchas recibidas desde el incremental anterior y exportaciones orientadas a Spark. Elegimos un incremental porque cumple con holgura el mínimo de 50\,000 registros de la consigna, se descarga y procesa en una laptop y, al ser parte de una serie que se publica periódicamente, encaja con la idea de actualizaciones incrementales. Para que todo el grupo trabaje con la misma versión fijamos un incremental concreto \citep{incremental2746}. La tabla~\ref{tab:dataset} resume sus características.
 
 \begin{table}[H]
 \centering
-\caption{Volcado utilizado en el proyecto.}
+\caption{Volcado utilizado en el proyecto}
 \label{tab:dataset}
 \begin{tabularx}{\textwidth}{l Y}
 \toprule
@@ -29,7 +29,7 @@ Un incremental no es todo ListenBrainz: contiene los eventos enviados a la plata
 
 La descarga la hacen \code{scripts/download_dataset.sh} (Linux y macOS) y \code{scripts/download_dataset.ps1} (Windows). Ambos bajan primero el archivo \code{.sha256} oficial, descargan el comprimido, comprueban que la huella SHA-256 coincida y recién entonces extraen el archivo de escuchas. La extracción escribe a un archivo temporal \code{.part} y lo renombra al terminar, así nunca queda un archivo incompleto con el nombre final. Si el comprimido ya existe y su huella es correcta, no se vuelve a descargar.
 
-\section{Estructura de cada registro}
+\subsection{Estructura de cada registro}
 
 Cada línea del archivo es un objeto JSON que representa una escucha. El siguiente ejemplo tiene la estructura real pero datos ficticios, para no publicar datos personales:
 
@@ -50,7 +50,7 @@ Cada línea del archivo es un objeto JSON que representa una escucha. El siguien
 
 \begin{table}[H]
 \centering
-\caption{Campos de una escucha.}
+\caption{Campos de una escucha}
 \label{tab:campos}
 \begin{tabularx}{\textwidth}{l l Y}
 \toprule
@@ -68,15 +68,15 @@ Campo & Significado & Observaciones \\
 \end{tabularx}
 \end{table}
 
-Los cuatro últimos campos están anidados dentro de \code{track_metadata}. La diferencia entre \code{timestamp} y \code{listened_at} es importante: algunas respuestas de la API de ListenBrainz usan \code{listened_at}~\cite{listenbrainz-json}, pero el archivo descargado usa \code{timestamp}, y todos los scripts del repositorio están adaptados a ese formato.
+Los cuatro últimos campos están anidados dentro de \code{track_metadata}. La diferencia entre \code{timestamp} y \code{listened_at} es importante: algunas respuestas de la API de ListenBrainz usan \code{listened_at} \citep{listenbrainzjson}, pero el archivo descargado usa \code{timestamp}, y todos los scripts del repositorio están adaptados a ese formato.
 
-\section{Volumen y exploración}
+\subsection{Volumen y exploración}
 
 La exploración inicial del archivo dio los valores de la tabla~\ref{tab:exploracion}.
 
 \begin{table}[H]
 \centering
-\caption{Exploración del incremental 2746.}
+\caption{Exploración del incremental 2746}
 \label{tab:exploracion}
 \begin{tabular}{l r}
 \toprule
@@ -91,13 +91,14 @@ Primera fecha de escucha (UTC) & 2005-02-13 \\
 Última fecha de escucha (UTC) & 2026-10-27 \\
 \bottomrule
 \end{tabular}
+\nota{Exploración local del archivo completo. Los conteos por nombre no equivalen a artistas o canciones únicos.}
 \end{table}
 
 Las cifras describen este incremento, no a la población de ListenBrainz. Los conteos por nombre tampoco equivalen a artistas o canciones únicos: hay homónimos, grafías distintas del mismo artista y registros sin identificador musical. Por eso los 1\,420\,842 \code{recording_msid} distintos no coinciden con las 1\,066\,683 combinaciones de artista y título: son dos criterios de identidad diferentes. El grafo de Neo4j usa el identificador y no fusiona canciones por título.
 
 El rango de fechas muestra otra particularidad: un registro enviado en 2026 puede tener fecha de escucha de 2005, porque los usuarios suben historiales antiguos. La ingesta, en cambio, se concentra en los últimos días de octubre de 2026. Solo el 26 de octubre tiene 1\,359\,824 escuchas, el 28~\% del archivo, y el 27 de octubre tiene apenas 4 porque el volcado se cortó a las 00:01. Este detalle reaparece al interpretar los KPIs.
 
-\section{Validación}
+\subsection{Validación}
 
 El script \code{scripts/validate_dataset.py} recorre el archivo en streaming, sin cargarlo en memoria, y comprueba cada línea. Un registro es válido si es un objeto JSON con \code{user_name} no vacío, \code{timestamp} entero, \code{track_metadata} como objeto y nombre de artista y de canción no vacíos. Además cuenta por separado los registros sin \code{user_id} entero y sin \code{recording_msid}, registra las fechas mínima y máxima y guarda los primeros errores para mostrarlos.
 
@@ -105,7 +106,7 @@ El script termina con error si hay algún registro inválido, si el archivo est�
 
 \begin{table}[H]
 \centering
-\caption{Argumentos de \code{validate_dataset.py}.}
+\caption{Argumentos de \code{validate_dataset.py}}
 \label{tab:validacion}
 \begin{tabularx}{\textwidth}{l l Y}
 \toprule
@@ -118,4 +119,4 @@ Argumento & Por defecto & Uso \\
 \end{tabularx}
 \end{table}
 
-Con el archivo completo la validación no encontró registros inválidos, y la preparación de Neo4j comprobó además que las 4\,855\,809 filas tienen \code{user_id} entero y \code{recording_msid} no vacío. Esta validación es un control de formato, no una auditoría estadística: no prueba que no haya duplicados ni que los eventos sean representativos. La detección de duplicados la hace cada loader al cargar, como se explica en los capítulos de cada base.
+Con el archivo completo la validación no encontró registros inválidos, y la preparación de Neo4j comprobó además que las 4\,855\,809 filas tienen \code{user_id} entero y \code{recording_msid} no vacío. Esta validación es un control de formato, no una auditoría estadística: no prueba que no haya duplicados ni que los eventos sean representativos. La detección de duplicados la hace cada loader al cargar, como se explica en las secciones de cada base.

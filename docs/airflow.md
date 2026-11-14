@@ -43,8 +43,6 @@ Los servicios de Airflow esperan con `depends_on: condition: service_healthy` a 
 extraer_datos >> validar_y_limpiar >> [cargar_mongodb, cargar_cassandra, cargar_neo4j] >> generar_kpis
 ```
 
-[Captura 1: Graph view del DAG en Airflow]
-
 `catchup=False` evita que al activar el DAG se lancen corridas atrasadas por cada día desde el `start_date`. `max_active_runs=1` es necesario porque cada corrida continúa donde quedó la anterior: dos corridas a la vez intentarían cargar el mismo bloque.
 
 Los tamaños de lote se configuran en Admin > Variables, sin tocar el código:
@@ -74,10 +72,6 @@ Las tres cargas dependen solo de la validación y no entre sí, por eso van en p
 **6. `generar_kpis`.** Espera a las tres cargas. Ejecuta el análisis de Neo4j (`analyze.main()`), que calcula afinidades entre artistas y comunidades con Louvain y guarda el resultado en el grafo y en `data/neo4j/analysis.json`. Luego consulta Cassandra con `get_daily_stats`, `get_top_artists` y `get_load_batches`, busca en Neo4j el artista con más oyentes y cuenta los documentos de Mongo. Con eso arma los 5 KPIs y guarda un snapshot con el `run_id` y la fecha en la colección `kpi_runs` de Mongo y en `data/airflow/kpis_latest.json`.
 
 Cada tarea devuelve un diccionario pequeño (conteos, rutas, banderas) que queda como XCom y se ve en la pestaña XCom de cada instancia. Los datos grandes nunca pasan por XCom: las tareas se comunican por el archivo y por las bases.
-
-[Captura 2: corrida completa en verde (Grid view)]
-
-[Captura 3: log de `cargar_cassandra` o `generar_kpis`]
 
 ## Cómo se simula la carga incremental
 
@@ -115,22 +109,6 @@ Cada tarea se puede repetir sin dejar datos duplicados, y eso es lo que permite 
 | `generar_kpis` | El análisis borra y vuelve a crear sus propias afinidades y comunidades; el snapshot se guarda con `replace_one` usando el `run_id` como `_id` |
 
 Un detalle para el reintento de Mongo: si una corrida falla en medio de un lote, el checkpoint queda en el último lote confirmado y las huellas se reconstruyen leyendo la colección al empezar, así que lo que alcanzó a entrar no se vuelve a insertar.
-
-## Tiempos medidos
-
-Por medir en la prueba con Docker.
-
-| Tarea | Primera corrida | Segunda corrida |
-| --- | --- | --- |
-| `extraer_datos` | por medir | por medir |
-| `validar_y_limpiar` | por medir | por medir |
-| `cargar_mongodb` | por medir | por medir |
-| `cargar_cassandra` | por medir | por medir |
-| `cargar_neo4j` | por medir | por medir |
-| `generar_kpis` | por medir | por medir |
-| DAG completo | por medir | por medir |
-
-Conteos después de cada corrida: por medir.
 
 ## Cómo levantarlo y ejecutarlo
 
@@ -174,11 +152,11 @@ Los de Cassandra se calculan sobre un día de referencia `d`: el penúltimo día
 
 Interpretación:
 
-- **Escuchas por día** mide el volumen que procesa el pipeline. Sirve para ver si un día viene con muchos menos datos de lo normal (un corte del dump o una falla de la fuente). Valor medido: por medir.
-- **Crecimiento diario** muestra la tendencia. En este dataset tiene saltos muy grandes porque el incremental concentra la ingesta en los últimos días de octubre: el 26 de octubre tiene el 28 % de todas las escuchas. Un salto así indica un cambio en la ingesta, no que la gente haya escuchado 30 veces más música. Valor medido: por medir.
-- **Escuchas por usuario activo** separa intensidad de alcance: si suben las escuchas pero no los usuarios, los mismos usuarios están escuchando más. Valor medido: por medir.
-- **Participación del artista líder** mide concentración. Un valor alto (BTS tiene 12,65 % de octubre según la carga completa de Cassandra) indica que un solo artista domina el mes; uno bajo, que las escuchas están repartidas. Valor medido: por medir.
-- **Entidad con más conexiones** es el grado de entrada del artista en el grafo usuario–artista: cuántos usuarios distintos lo escuchan, sin importar cuántas veces. Mide alcance, no volumen; un artista puede tener muchas escuchas de pocos fans y otro pocas escuchas de mucha gente. Valor medido: por medir.
+- **Escuchas por día** mide el volumen que procesa el pipeline. Sirve para ver si un día viene con muchos menos datos de lo normal (un corte del dump o una falla de la fuente).
+- **Crecimiento diario** muestra la tendencia. En este dataset tiene saltos muy grandes porque el incremental concentra la ingesta en los últimos días de octubre: el 26 de octubre tiene el 28 % de todas las escuchas. Un salto así indica un cambio en la ingesta, no que la gente haya escuchado 30 veces más música.
+- **Escuchas por usuario activo** separa intensidad de alcance: si suben las escuchas pero no los usuarios, los mismos usuarios están escuchando más.
+- **Participación del artista líder** mide concentración. Un valor alto (BTS tiene 12,65 % de octubre según la carga completa de Cassandra) indica que un solo artista domina el mes; uno bajo, que las escuchas están repartidas.
+- **Entidad con más conexiones** es el grado de entrada del artista en el grafo usuario–artista: cuántos usuarios distintos lo escuchan, sin importar cuántas veces. Mide alcance, no volumen; un artista puede tener muchas escuchas de pocos fans y otro pocas escuchas de mucha gente.
 
 Como métricas de seguimiento el snapshot incluye el total acumulado de documentos en Mongo, los lotes y escuchas cargados en Cassandra, los totales del grafo y del análisis de Neo4j (comunidades, modularidad y cobertura de recomendaciones).
 

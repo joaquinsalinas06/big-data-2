@@ -1,0 +1,11 @@
+# Paquetes que usa el pipeline dentro de la imagen de Airflow.
+# Es un subconjunto del requirements.txt de la raíz: el dashboard y la API no corren aquí.
+# Las versiones exactas las fija el archivo de constraints de Airflow al construir la imagen.
+pymongo>=4.10.0,<5
+pydantic>=2.10.0,<3
+cassandra-driver>=3.29.0
+pyasyncore
+neo4j>=5.20.0,<7
+networkx>=3.2
+python-dotenv>=1.0.0
+pytz>=2024.1

@@ -1,0 +1,93 @@
+\chapter{Arquitectura propuesta}
+\label{cap:arquitectura}
+
+\section{Visión general}
+
+La arquitectura tiene una sola fuente, el volcado incremental de ListenBrainz, y tres bases de datos que reciben los mismos datos con modelos distintos. Airflow descarga y valida el archivo, carga cada base y al final calcula los indicadores, que quedan disponibles para el dashboard. La figura~\ref{fig:arquitectura} muestra el flujo.
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+  caja/.style={draw, rounded corners=2pt, align=center, minimum height=1.15cm, text width=2.45cm, font=\small},
+  flecha/.style={-{Stealth[length=2.2mm]}, semithick}]
+  \node[caja] (lb) {ListenBrainz\\incremental 2746};
+  \node[caja, right=0.7cm of lb] (af) {Airflow\\extracción y\\validación};
+  \node[caja, right=1.1cm of af] (cas) {Cassandra\\serie temporal\\y agregados};
+  \node[caja, above=0.45cm of cas] (mon) {MongoDB\\documentos\\originales};
+  \node[caja, below=0.45cm of cas] (neo) {Neo4j\\grafo de\\relaciones};
+  \node[caja, right=1.1cm of cas] (kpi) {Airflow\\cálculo de KPIs};
+  \node[caja, below=0.45cm of kpi] (dash) {Dashboard\\Streamlit};
+  \draw[flecha] (lb) -- (af);
+  \draw[flecha] (af.east) -- (mon.west);
+  \draw[flecha] (af) -- (cas);
+  \draw[flecha] (af.east) -- (neo.west);
+  \draw[flecha] (mon.east) -- (kpi.west);
+  \draw[flecha] (cas) -- (kpi);
+  \draw[flecha] (neo.east) -- (kpi.west);
+  \draw[flecha] (kpi) -- (dash);
+  \draw[flecha, dashed] (neo) -- (dash);
+\end{tikzpicture}
+\caption{Flujo de datos de Music DNA. Las flechas punteadas indican que el dashboard también consulta las bases directamente.}
+\label{fig:arquitectura}
+\end{figure}
+
+Todo el stack se levanta con un único \code{docker-compose.yml} en la raíz del repositorio. Cada base tiene además su propio compose dentro de \code{databases/}, para que cada integrante pudiera trabajar su parte de forma aislada. La tabla~\ref{tab:servicios} resume los servicios.
+
+\begin{table}[H]
+\centering
+\caption{Servicios del \code{docker-compose.yml} de la raíz.}
+\label{tab:servicios}
+\begin{tabularx}{\textwidth}{l l l Y}
+\toprule
+Servicio & Imagen & Puertos & Función \\
+\midrule
+\code{mongodb} & mongo:7.0 & 27017 & Documentos originales y snapshots de KPIs \\
+\code{cassandra} & cassandra:5.0 & 9042 & Serie temporal y métricas agregadas por fecha \\
+\code{neo4j} & neo4j:5.26.0 & 7474, 7687 & Grafo usuario--canción--artista y comunidades \\
+\code{postgres} & postgres:16 & -- & Metadatos de Airflow \\
+\code{airflow-init} & imagen propia & -- & Migra la base de metadatos y crea el usuario administrador \\
+\code{airflow-webserver} & imagen propia & 8080 & Interfaz web de Airflow \\
+\code{airflow-scheduler} & imagen propia & -- & Programa y ejecuta las tareas del DAG \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+Cada base tiene un healthcheck (\texttt{mongosh} con un \texttt{ping}, \texttt{cqlsh} con \texttt{DESCRIBE KEYSPACES} y una petición HTTP al puerto 7474 de Neo4j) y los servicios de Airflow esperan a que las tres respondan antes de arrancar. Cassandra tiene un heap de 2~GB y Neo4j entre 1 y 2~GB de heap más 1~GB de page cache, por lo que el stack completo necesita alrededor de 10~GB de memoria asignada a Docker. Los datos de cada base se guardan en volúmenes de Docker, así que sobreviven a reiniciar los contenedores.
+
+El código de acceso a datos está centralizado en \code{databases/}, con la misma estructura para las tres bases: \code{connection.py} (conexión configurable por variables de entorno), \code{crud.py} (demostración de las cuatro operaciones), \code{loader.py} (carga por lotes) y \code{queries.py} (consultas analíticas). Airflow importa esos mismos módulos, de modo que lo que se probó por consola es lo que corre en el pipeline.
+
+\section{Qué dato va en cada base y por qué}
+
+La consigna pide justificar técnicamente por qué cada tipo de dato se almacena en una base determinada. La tabla~\ref{tab:justificacion} lo resume y los párrafos siguientes lo desarrollan.
+
+\begin{table}[H]
+\centering
+\caption{Distribución de los datos entre las tres bases.}
+\label{tab:justificacion}
+\begin{tabularx}{\textwidth}{l Y Y}
+\toprule
+Base & Qué guarda & Consulta típica \\
+\midrule
+MongoDB & Cada escucha como documento JSON, tal como viene del volcado; snapshots de KPIs por corrida & Historial de un usuario, escuchas de un artista, agregaciones exploratorias, CRUD por API \\
+Cassandra & Escuchas por usuario y mes; agregados diarios y mensuales; registro de lotes cargados & Serie diaria del año, top de artistas del mes, evolución de un artista \\
+Neo4j & Usuarios, canciones y artistas como nodos; escuchas agregadas como relaciones; afinidades y comunidades & Artistas que comparten oyentes, recomendaciones, comunidades, artistas puente \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\paragraph{MongoDB para los documentos originales.} Cada escucha es un objeto JSON con una parte fija (usuario, fecha, canción, artista) y una parte variable: \code{track_metadata.additional_info} trae metadatos distintos según el cliente que envió la escucha, y algunos campos como \code{release_name} o \code{recording_msid} pueden faltar. Un modelo documental guarda cada registro sin forzar un esquema rígido y conserva el original para volver a procesarlo si cambia la lógica de las otras bases. Los índices compuestos sobre fecha, usuario y artista permiten consultas puntuales sin recorrer la colección. Por la misma razón los snapshots de KPIs que genera Airflow, que son documentos anidados, también se guardan en MongoDB.
+
+\paragraph{Cassandra para la serie temporal y las métricas.} Los indicadores por fecha se consultan siempre de la misma forma y sobre millones de escuchas. Cassandra está pensada para escrituras masivas y para consultas que se conocen de antemano: se diseña una tabla por consulta y cada lectura va a una sola partición, con las filas ya ordenadas por la clave de clustering. Así, la serie diaria de un año o el ranking de artistas de un mes se leen en milisegundos sin importar el volumen total. El costo es repetir datos entre tablas y no poder hacer consultas ad hoc.
+
+\paragraph{Neo4j para las relaciones.} Las preguntas sobre afinidad entre artistas, comunidades y recomendaciones son recorridos: desde un usuario hacia los artistas que escucha, desde ahí hacia artistas afines y de vuelta a otros usuarios. En un grafo esos recorridos siguen punteros entre nodos, mientras que en las otras bases serían uniones sucesivas sobre tablas o colecciones grandes. Neo4j además permite guardar el resultado del análisis de comunidades como parte del mismo grafo y consultarlo con Cypher.
+
+\section{Flujo de datos}
+
+El flujo completo lo ejecuta el DAG de Airflow descrito en el capítulo~\ref{cap:airflow}:
+
+\begin{enumerate}
+  \item Se descarga el incremental 2746 desde MetaBrainz, se verifica su SHA-256 y se extrae a \code{data/processed/listens_full.jsonl}.
+  \item Se valida el archivo completo: formato de cada línea, campos obligatorios y cantidad total de registros.
+  \item Se cargan las tres bases en paralelo. MongoDB y Cassandra reciben un bloque nuevo en cada corrida, lo que simula la llegada incremental de datos; Neo4j carga el grafo completo una sola vez.
+  \item Se ejecuta el análisis de comunidades en Neo4j y se calculan los cinco KPIs a partir de Cassandra y Neo4j. El resultado se guarda en la colección \code{kpi_runs} de MongoDB y en \code{data/airflow/kpis_latest.json}, que es lo que lee el dashboard.
+\end{enumerate}

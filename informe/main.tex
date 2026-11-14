@@ -24,9 +24,20 @@
 \titleformat{\chapter}[hang]{\Large\bfseries}{\thechapter.}{0.6em}{}
 \titlespacing*{\chapter}{0pt}{0pt}{1.2em}
 
-% Identificadores de código en el texto: se cortan en cualquier carácter si no entran en la línea
+% Identificadores de código en el texto. Funciona también dentro de tablas y leyendas,
+% y permite cortar la línea después de _ y de / cuando el nombre es largo.
 \urlstyle{tt}
-\DeclareUrlCommand\code{\urlstyle{tt}}
+\ExplSyntaxOn
+\tl_new:N \l__informe_code_tl
+\cs_generate_variant:Nn \tl_replace_all:Nnn { NVn }
+\NewDocumentCommand \code { m }
+  {
+    \tl_set:Nx \l__informe_code_tl { \tl_to_str:n {#1} }
+    \tl_replace_all:NVn \l__informe_code_tl \c_underscore_str { \textunderscore \allowbreak }
+    \tl_replace_all:Nnn \l__informe_code_tl { / } { / \allowbreak }
+    \texttt { \l__informe_code_tl }
+  }
+\ExplSyntaxOff
 
 \setlength{\parskip}{0.4em}
 \renewcommand{\arraystretch}{1.15}

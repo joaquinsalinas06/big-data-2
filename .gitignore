@@ -8,6 +8,14 @@ data/neo4j/
 *.zst
 *.part
 *.sha256
+data/airflow/
+data/*.sqlite3
+
+# Airflow: logs de las corridas y plugins locales (solo se versiona la carpeta)
+airflow/logs/*
+!airflow/logs/.gitkeep
+airflow/plugins/*
+!airflow/plugins/.gitkeep
 
 # Python y sistema
 __pycache__/

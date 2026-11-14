@@ -1,0 +1,28 @@
+\section{Dashboard analítico}
+\label{cap:dashboard}
+
+El dashboard se construye con Streamlit \citep{streamlit} y se conecta a las tres bases. Para los indicadores no recalcula nada: lee el snapshot que deja Airflow, ya sea el archivo \code{data/airflow/kpis_latest.json} o el último documento de la colección \code{kpi_runs} de MongoDB. Así el dashboard muestra exactamente los mismos valores que calculó el pipeline, y si se consulta \code{kpi_runs} completa, ordenada por \code{generado_en}, también puede mostrar cómo cambian los indicadores entre corridas.
+
+Para las vistas de detalle consulta cada base con las funciones que ya existen en \code{databases/}: las de \code{queries.py} de Cassandra, que devuelven listas de diccionarios fáciles de convertir en tablas, las consultas de grafo de Neo4j y las agregaciones de MongoDB.
+
+La tabla~\ref{tab:dashboard} relaciona cada indicador con la visualización que le corresponde y con su fuente.
+
+\begin{table}[H]
+\centering
+\caption{Visualización de cada indicador en el dashboard}
+\label{tab:dashboard}
+\begin{tabularx}{\textwidth}{l Y Y}
+\toprule
+Indicador & Visualización & Fuente \\
+\midrule
+Escuchas por día & Tarjeta con el valor del día de referencia y gráfico de líneas de la serie diaria & \code{kpis.escuchas_por_dia} y \code{serie_diaria} \\
+Crecimiento diario & Tarjeta con el porcentaje y gráfico de barras del crecimiento de cada día & \code{kpis.crecimiento_diario_pct} y \code{serie_diaria} \\
+Escuchas por usuario activo & Tarjeta con el promedio y los usuarios activos del día & \code{kpis.escuchas_por_usuario_activo} \\
+Participación del artista líder & Tarjeta con el artista y su porcentaje, y gráfico de barras del top del mes & \code{kpis.participacion_artista_lider} y \code{get_top_artists} de Cassandra \\
+Entidad con más conexiones & Tarjeta con el artista y su número de oyentes, y tabla de comunidades del grafo & \code{kpis.entidad_mas_conectada} y consultas de Neo4j \\
+Seguimiento de la carga & Evolución de los documentos en MongoDB y de los lotes de Cassandra por corrida & \code{seguimiento} en \code{kpi_runs} \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+La serie diaria del snapshot cubre los últimos 30 días del año de referencia. Al graficarla hay que mostrar la advertencia de la sección~\ref{cap:kpis}: los saltos de fines de octubre se deben a la forma en que llegó la ingesta al incremental, no a un cambio real en la cantidad de música escuchada.

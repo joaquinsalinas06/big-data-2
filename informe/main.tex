@@ -22,6 +22,9 @@
 \usetikzlibrary{arrows.meta,positioning,fit,babel}
 \usepackage{caption}
 
+% En la fuente de código, >> y -- deben verse tal cual y no como comillas o guiones largos
+\DisableLigatures[<,>,-]{encoding = T1, family = tt*}
+
 \setcitestyle{authoryear,round,aysep={,},yysep={;}}
 \renewcommand{\bibfont}{\normalsize\raggedright}
 \setlength{\bibhang}{0.5in}
@@ -251,9 +254,9 @@ Neo4j, Inc. (s.f.).
 
 \bibitem[{NetworkX Developers}(s.f.)]{networkx}
 NetworkX Developers. (s.f.).
-\textit{louvain\_communities}. Documentación de NetworkX. Recuperado el 14 de noviembre de 2026.
+\textit{Communities}. Documentación de NetworkX. Recuperado el 14 de noviembre de 2026.
 \newline
-\url{https://networkx.org/documentation/stable/reference/algorithms/generated/networkx.algorithms.community.louvain.louvain_communities.html}
+\url{https://networkx.org/documentation/stable/reference/algorithms/community.html}
 
 \bibitem[{Snowflake Inc.}(s.f.)]{streamlit}
 Snowflake Inc. (s.f.).

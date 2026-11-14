@@ -12,6 +12,7 @@ from databases.mongodb.connection import get_client, get_collection, ensure_inde
 from databases.mongodb.app.services.import_service import import_file
 
 MAX_TARGET = 4_000_000  # tope que acepta process_file
+ROOT = Path(__file__).resolve().parents[2]
 
 
 def load_to_mongodb(
@@ -31,7 +32,7 @@ def load_to_mongodb(
         raise FileNotFoundError(f"Archivo de origen no encontrado: {source}")
 
     if state_path is None:
-        state_path = Path("data/import_state_mongo.sqlite3")
+        state_path = ROOT / "data/import_state_mongo.sqlite3"
 
     with get_client() as client:
         collection = get_collection(client)

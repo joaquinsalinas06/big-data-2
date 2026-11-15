@@ -150,14 +150,13 @@ Eliminar & \code{delete_listen} & \texttt{DELETE FROM listens\_by\_user} con la 
 
 Dos detalles de Cassandra explican el código. Primero, \texttt{INSERT} y \texttt{UPDATE} son \emph{upserts}: un \texttt{UPDATE} sobre una fila que no existe la crea. Por eso \code{update_listen} y \code{delete_listen} leen la fila antes y devuelven \texttt{False} si no existe. Segundo, no usamos \texttt{IF EXISTS}. Lo probamos y fallaba: esas escrituras (transacciones ligeras) usan el reloj del servidor y las normales el del cliente. Con Docker en Windows, el \texttt{UPDATE ... IF EXISTS} respondía que se había aplicado, pero quedaba con un timestamp anterior al del \texttt{INSERT} y Cassandra conservaba el valor viejo.
 
-La demostración (\code{python -m databases.cassandra.crud --step}) usa el usuario $-1$, que no existe en ListenBrainz: inserta una escucha, la lee, la corrige, la borra y comprueba que ya no está. Termina con una lectura real de las últimas escuchas de un usuario del dataset. El CRUD no modifica las tablas agregadas, que se recalculan en cada carga. La figura~\ref{fig:cassandra-crud} muestra los cuatro primeros pasos ejecutados contra el keyspace que dejó Airflow.
+La demostración (\code{python -m databases.cassandra.crud --step}) usa el usuario $-1$, que no existe en ListenBrainz: inserta una escucha, la lee, la corrige, la borra y comprueba que ya no está. Termina con una lectura real de las últimas escuchas de un usuario del dataset. El CRUD no modifica las tablas agregadas, que se recalculan en cada carga. La figura~\ref{fig:cassandra-crud} muestra las cuatro operaciones sobre la escucha de prueba, ejecutadas contra el keyspace que dejó Airflow.
 
 \begin{figure}[H]
 \caption{Demostración del CRUD en Cassandra}
 \label{fig:cassandra-crud}
 \centering
-\includegraphics[width=0.9\textwidth]{figuras/cassandra_crud.png}
-\nota{El quinto paso, la lectura de un usuario real, no se incluye para no publicar su identificador.}
+\includegraphics[width=\textwidth]{figuras/cassandra_crud.png}
 \end{figure}
 
 \subsection{Consultas}

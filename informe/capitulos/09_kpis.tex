@@ -119,12 +119,12 @@ Campo & Contenido \\
 \nota{En \code{kpi_runs} el \code{_id} de cada documento es el \code{run_id}, de modo que un reintento de la tarea reemplaza el snapshot en lugar de duplicarlo.}
 \end{table}
 
-La figura~\ref{fig:kpi-runs} muestra los dos documentos de \code{kpi_runs}, uno por corrida, con los valores de los indicadores y las métricas de seguimiento que permiten ver cómo creció la carga.
+La figura~\ref{fig:kpi-runs} muestra los dos documentos de \code{kpi_runs}, uno por corrida, con los cinco indicadores de cada uno. Los valores son los mismos de la tabla~\ref{tab:kpis-valores}.
 
 \begin{figure}[H]
 \caption{Snapshots de KPIs guardados en \code{kpi_runs}}
 \label{fig:kpi-runs}
 \centering
 \includegraphics[width=\textwidth]{figuras/kpis_latest.png}
-\nota{La consulta proyecta solo los valores, los artistas y dos métricas de seguimiento; cada documento guarda además el nombre, la unidad y la fuente de cada KPI y la serie diaria.}
+\nota{A la izquierda, el snapshot de la primera corrida (manual); a la derecha, el de la segunda (programada). Se muestra la parte \code{kpis} de cada documento; además de eso, cada snapshot guarda las fechas de referencia, las métricas de seguimiento y la serie diaria.}
 \end{figure}

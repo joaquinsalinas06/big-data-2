@@ -55,13 +55,13 @@ Servicio & Imagen & Puertos & Función \\
 
 Cada base tiene un healthcheck (\texttt{mongosh} con un \texttt{ping}, \texttt{cqlsh} con \texttt{DESCRIBE KEYSPACES} y una petición HTTP al puerto 7474 de Neo4j) y los servicios de Airflow esperan a que las tres respondan antes de arrancar. Cassandra tiene un heap de 2~GB y Neo4j entre 1 y 2~GB de heap más 1~GB de page cache, por lo que el stack completo necesita alrededor de 10~GB de memoria asignada a Docker. Los datos de cada base se guardan en volúmenes de Docker, así que sobreviven a reiniciar los contenedores.
 
-La figura~\ref{fig:docker-ps} muestra el stack levantado: los seis servicios que quedan en ejecución responden su healthcheck y \code{airflow-init} termina con código 0 después de migrar la base de metadatos. Esa laptop tenía 8~GB de RAM, menos de lo que pide el compose, así que bajamos la memoria de cada base con un archivo de override local (sección~\ref{sec:airflow-corridas}).
+La figura~\ref{fig:docker-ps} muestra el stack levantado: los seis servicios que quedan en ejecución aparecen como \texttt{healthy}. \code{airflow-init} no figura en la lista porque corre una sola vez, migra la base de metadatos y termina. Esa laptop tenía 8~GB de RAM, menos de lo que pide el compose, así que bajamos la memoria de cada base con un archivo de override local (sección~\ref{sec:airflow-corridas}).
 
 \begin{figure}[H]
 \caption{Servicios del stack después de \texttt{docker compose up -d}}
 \label{fig:docker-ps}
 \centering
-\includegraphics[width=0.8\textwidth]{figuras/docker_ps.png}
+\includegraphics[width=\textwidth]{figuras/docker_ps.png}
 \nota{Salida de \texttt{docker compose ps} en la laptop donde se midieron las corridas del DAG.}
 \end{figure}
 

@@ -95,11 +95,11 @@ Los cuatro primeros valores crecen de una corrida a otra porque cada lote agrega
 
 \subsection{Métricas de seguimiento}
 
-Además de los cinco KPIs, cada snapshot guarda métricas que sirven para seguir el estado del pipeline: el total acumulado de documentos en MongoDB y los insertados en la corrida, los lotes y escuchas cargados en Cassandra, los usuarios, canciones y escuchas del grafo, y los indicadores del análisis de Neo4j (cantidad de comunidades, modularidad y cobertura de recomendaciones). El total acumulado en MongoDB y los lotes de Cassandra permiten ver en el dashboard cómo crece la carga incremental de una corrida a otra.
+Además de los cinco KPIs, cada snapshot guarda métricas que sirven para seguir el estado del pipeline: el total acumulado de documentos en MongoDB y los insertados en la corrida, los lotes y escuchas cargados en Cassandra, los usuarios, canciones y escuchas del grafo, y los indicadores del análisis de Neo4j (cantidad de comunidades, modularidad y cobertura de recomendaciones). El total acumulado en MongoDB y los lotes de Cassandra permiten ver cómo crece la carga incremental de una corrida a otra.
 
 \subsection{Formato del snapshot}
 
-El snapshot tiene la misma forma en \code{data/airflow/kpis_latest.json} y en cada documento de la colección \code{kpi_runs}, pensada para que el dashboard la lea sin transformarla:
+El snapshot tiene la misma forma en \code{data/airflow/kpis_latest.json} y en cada documento de la colección \code{kpi_runs}, pensada para que el dashboard la pueda leer sin transformarla. La tabla~\ref{tab:snapshot} describe sus campos.
 
 \begin{table}[H]
 \centering

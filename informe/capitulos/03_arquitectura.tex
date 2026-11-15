@@ -29,7 +29,7 @@ La arquitectura tiene una sola fuente, el volcado incremental de ListenBrainz, y
   \draw[flecha] (kpi) -- (dash);
   \draw[flecha, dashed] (neo) -- (dash);
 \end{tikzpicture}
-\nota{La flecha punteada indica que el dashboard también consulta las bases directamente, además del snapshot de KPIs.}
+\nota{La flecha punteada indica que, en el diseño, el dashboard consulta también las bases directamente, además del snapshot de KPIs.}
 \end{figure}
 
 Todo el stack se levanta con un único \code{docker-compose.yml} en la raíz del repositorio. Cada base tiene además su propio compose dentro de \code{databases/}, para que cada integrante pudiera trabajar su parte de forma aislada. La tabla~\ref{tab:servicios} resume los servicios.
@@ -69,7 +69,7 @@ El código de acceso a datos está centralizado en \code{databases/}, con la mis
 
 \subsection{Qué dato va en cada base y por qué}
 
-La consigna pide justificar técnicamente por qué cada tipo de dato se almacena en una base determinada. La tabla~\ref{tab:justificacion} lo resume y los párrafos siguientes lo desarrollan.
+La tabla~\ref{tab:justificacion} resume qué guarda cada base y qué consultas resuelve; los párrafos siguientes justifican cada elección.
 
 \begin{table}[H]
 \centering
@@ -86,7 +86,7 @@ Neo4j & Usuarios, canciones y artistas como nodos; escuchas agregadas como relac
 \end{tabularx}
 \end{table}
 
-\paragraph{MongoDB para los documentos originales.} Cada escucha es un objeto JSON con una parte fija (usuario, fecha, canción, artista) y una parte variable: \code{track_metadata.additional_info} trae metadatos distintos según el cliente que envió la escucha, y algunos campos como \code{release_name} o \code{recording_msid} pueden faltar. Un modelo documental guarda cada registro sin forzar un esquema rígido y conserva el original para volver a procesarlo si cambia la lógica de las otras bases. Los índices compuestos sobre fecha, usuario y artista permiten consultas puntuales sin recorrer la colección \citep{mongodb}. Por la misma razón los snapshots de KPIs que genera Airflow, que son documentos anidados, también se guardan en MongoDB.
+\paragraph{MongoDB para los documentos originales.} Cada escucha es un objeto JSON con una parte fija (usuario, fecha, canción, artista) y una parte variable: \code{track_metadata.additional_info} trae metadatos distintos según el cliente que envió la escucha, y campos como \code{release_name} son opcionales. Un modelo documental guarda cada registro sin forzar un esquema rígido y conserva el original para volver a procesarlo si cambia la lógica de las otras bases. Los índices compuestos sobre fecha, usuario y artista permiten consultas puntuales sin recorrer la colección \citep{mongodb}. Por la misma razón los snapshots de KPIs que genera Airflow, que son documentos anidados, también se guardan en MongoDB.
 
 \paragraph{Cassandra para la serie temporal y las métricas.} Los indicadores por fecha se consultan siempre de la misma forma y sobre millones de escuchas. Cassandra está pensada para escrituras masivas y para consultas que se conocen de antemano: se diseña una tabla por consulta y cada lectura va a una sola partición, con las filas ya ordenadas por la clave de clustering \citep{cassandra}. Así, la serie diaria de un año o el ranking de artistas de un mes se leen en milisegundos sin importar el volumen total. El costo es repetir datos entre tablas y no poder hacer consultas ad hoc.
 
@@ -100,5 +100,5 @@ El flujo completo lo ejecuta el DAG de Airflow descrito en la sección~\ref{cap:
   \item Se descarga el incremental 2746 desde MetaBrainz, se verifica su SHA-256 y se extrae a \code{data/processed/listens_full.jsonl}.
   \item Se valida el archivo completo: formato de cada línea, campos obligatorios y cantidad total de registros.
   \item Se cargan las tres bases en paralelo. MongoDB y Cassandra reciben un bloque nuevo en cada corrida, lo que simula la llegada incremental de datos; Neo4j carga el grafo completo una sola vez.
-  \item Se ejecuta el análisis de comunidades en Neo4j y se calculan los cinco KPIs a partir de Cassandra y Neo4j. El resultado se guarda en la colección \code{kpi_runs} de MongoDB y en \code{data/airflow/kpis_latest.json}, que es lo que lee el dashboard.
+  \item Se ejecuta el análisis de comunidades en Neo4j y se calculan los cinco KPIs a partir de Cassandra y Neo4j. El resultado se guarda en la colección \code{kpi_runs} de MongoDB y en \code{data/airflow/kpis_latest.json}, que es la fuente prevista para el dashboard.
 \end{enumerate}

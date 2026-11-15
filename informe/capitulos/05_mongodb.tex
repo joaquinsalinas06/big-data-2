@@ -44,7 +44,7 @@ Se crean tres índices compuestos, pensados para las consultas que hace la aplic
 \end{tabularx}
 \end{table}
 
-La validación del módulo comprobó con \code{explain} que las tres consultas usan su índice (etapa \code{IXSCAN}) y que examinan exactamente los documentos que devuelven: por ejemplo, 20 claves examinadas para 20 resultados en la consulta cronológica, con un tiempo de ejecución de 1~ms sobre una colección de 4\,000\,001 documentos.
+La validación del módulo comprobó con \code{explain} que las tres consultas usan su índice (etapa \code{IXSCAN}) y que examinan exactamente los documentos que devuelven: por ejemplo, 20 claves examinadas para 20 resultados en la consulta cronológica, con un tiempo de ejecución de 1~ms sobre la colección de prueba de 4\,000\,001 documentos que se describe en la subsección siguiente.
 
 \subsection{Carga por lotes}
 
@@ -61,11 +61,11 @@ Gracias al checkpoint, una carga interrumpida continúa desde el último lote co
 
 Al integrar el módulo con Airflow corregimos el cálculo de ese tope. \code{load_to_mongodb} le pasaba \code{limit} como total objetivo de la colección, así que desde la segunda ejecución el objetivo ya estaba alcanzado y no se insertaba nada. Ahora el objetivo es la cantidad actual de documentos más \code{limit}, con el tope de 4\,000\,000, y cada ejecución agrega el siguiente bloque del archivo.
 
-La validación del módulo se hizo sobre una colección de 4\,000\,001 documentos. La importación que la llenó procesó 4\,000\,000 de líneas en unos 5\,570 segundos: insertó 3\,950\,000 y marcó 50\,000 como duplicadas, que eran justamente los 50\,000 documentos ya cargados en una prueba anterior. Según su registro, esa carga se leyó del incremental 2754 (31 de octubre de 2026), un volcado posterior al que usa el resto del proyecto, por lo que sus resultados analíticos no se comparan directamente con los de Cassandra y Neo4j. En las corridas del DAG la colección se llena con el incremental 2746, igual que las otras dos bases (sección~\ref{sec:airflow-corridas}).
+Las pruebas de rendimiento del módulo se hicieron antes de integrarlo al pipeline, sobre una colección de 4\,000\,001 documentos. La importación que la llenó procesó 4\,000\,000 de líneas en unos 5\,570 segundos: insertó 3\,950\,000 y marcó como duplicadas 50\,000, que eran los documentos de una prueba anterior. Esa colección se llenó con el incremental 2754 (31 de octubre de 2026) y no con el 2746, así que sus cifras sirven para medir el loader y los índices, pero no se comparan con las de Cassandra y Neo4j. En el pipeline, MongoDB se carga con el incremental 2746, igual que las otras dos bases (sección~\ref{sec:airflow-corridas}).
 
 \subsection{Operaciones CRUD}
 
-El script \code{python -m databases.mongodb.crud --pause} demuestra las cuatro operaciones con funciones de \code{databases/mongodb/crud.py}, deteniéndose entre pasos para explicarlas:
+El script \code{python -m databases.mongodb.crud --pause} demuestra las cuatro operaciones con funciones de \code{databases/mongodb/crud.py}, deteniéndose entre pasos para explicarlas. La tabla~\ref{tab:mongo-crud} resume qué hace cada una.
 
 \begin{table}[H]
 \centering

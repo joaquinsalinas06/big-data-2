@@ -91,6 +91,8 @@ MERGE (u)-[r:ESCUCHO {lote:$dataset}]->(c)
 SET r.cantidad=f.count, r.primera_escucha=f.first, r.ultima_escucha=f.last
 \end{lstlisting}
 
+La tabla~\ref{tab:neo4j-carga} resume la carga completa del incremental 2746 en una laptop con macOS. En la laptop de 8~GB donde corrimos el DAG, la misma tarea tardó 261,7~s en la preparación y unos 778~s en la carga (sección~\ref{sec:airflow-corridas}).
+
 \begin{table}[H]
 \centering
 \caption{Resultado de la carga completa en Neo4j}
@@ -157,7 +159,7 @@ Vale 0 si todas sus conexiones están en una sola comunidad y crece cuando se re
 D(u) = -\frac{\sum_{c} p_{u,c} \ln p_{u,c}}{\ln k_u}
 \]
 
-con $D(u) = 0$ si escucha una sola comunidad. La tabla~\ref{tab:neo4j-analisis} resume el resultado.
+con $D(u) = 0$ si escucha una sola comunidad. Las tablas~\ref{tab:neo4j-analisis} y~\ref{tab:neo4j-comunidades} resumen el resultado y las comunidades detectadas.
 
 \begin{table}[H]
 \centering

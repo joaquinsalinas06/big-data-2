@@ -5,13 +5,13 @@ El proyecto construyó una arquitectura multimodelo completa sobre un volcado re
 
 \subsection{Aprendizajes}
 
-El primero es que el modelo de datos se diseña a partir de las consultas. En Cassandra eso es explícito: una tabla por consulta, particiones por usuario y mes para que ninguna crezca sin límite y el ranking guardado como clustering porque es la única forma de que Cassandra lo devuelva ordenado. A cambio, las consultas que usa el dashboard tardan entre 6 y 16~ms sobre millones de filas. En Neo4j el mismo criterio llevó a agregar las escuchas en relaciones con cantidad y proporción, que redujeron 4,86 millones de eventos a 1,79 millones de relaciones usuario--canción y dejaron en el grafo exactamente lo que necesitan las recomendaciones.
+Aprendimos que el modelo de datos se diseña a partir de las consultas. En Cassandra eso es explícito: una tabla por consulta, particiones por usuario y mes para que ninguna crezca sin límite y el ranking guardado como clustering porque es la única forma de que Cassandra lo devuelva ordenado. A cambio, las consultas de Cassandra tardan entre 6 y 16~ms sobre millones de filas. En Neo4j el mismo criterio llevó a agregar las escuchas en relaciones con cantidad y proporción, que redujeron 4,86 millones de eventos a 1,79 millones de relaciones usuario--canción y dejaron en el grafo exactamente lo que necesitan las recomendaciones.
 
-El segundo es que, en un pipeline que se reintenta, la idempotencia importa más que la velocidad. Las tres cargas se pueden repetir sin duplicar datos por razones distintas: huellas SHA-256 y checkpoint en MongoDB, ids deterministas y registro de lotes en Cassandra, \texttt{MERGE} y estado del lote en Neo4j. En Cassandra esto incluso obligó a abandonar los counters, que suman dos veces si un lote se repite, y a recalcular los agregados en cada carga.
+En un pipeline que se reintenta, la idempotencia importa más que la velocidad. Las tres cargas se pueden repetir sin duplicar datos por razones distintas: huellas SHA-256 y checkpoint en MongoDB, ids deterministas y registro de lotes en Cassandra, \texttt{MERGE} y estado del lote en Neo4j. En Cassandra esto incluso obligó a abandonar los counters, que suman dos veces si un lote se repite, y a recalcular los agregados en cada carga.
 
-El tercero es que hay que conocer el dato antes de interpretarlo. Un incremental describe la ingesta, no la escucha: hay escuchas fechadas en 2005 enviadas en 2026, el 26 de octubre concentra el 28~\% del archivo y el volcado se corta el 27 a las 00:01. Sin esa lectura, el crecimiento de $+3\,364$~\% o la participación de BTS parecerían hallazgos sobre los oyentes, cuando son efectos de cómo llegaron los datos.
+También vimos que hay que conocer el dato antes de interpretarlo. Un incremental describe la ingesta, no la escucha: hay escuchas fechadas en 2005 enviadas en 2026, el 26 de octubre concentra el 28~\% del archivo y el volcado se corta el 27 a las 00:01. Sin esa lectura, el crecimiento de $+3\,364$~\% o la participación de BTS parecerían hallazgos sobre los oyentes, cuando son efectos de cómo llegaron los datos.
 
-Por último, integrar módulos hechos por separado sacó a la luz errores que no se veían en cada parte: el loader de MongoDB no insertaba nada desde la segunda ejecución porque tomaba el límite por corrida como total objetivo, y una variable de entorno de Cassandra tenía un nombre distinto en la plantilla de configuración y en el código. Probar el flujo completo es lo que permite encontrarlos.
+Integrar módulos hechos por separado sacó a la luz errores que no se veían en cada parte: el loader de MongoDB no insertaba nada desde la segunda ejecución porque tomaba el límite por corrida como total objetivo, y una variable de entorno de Cassandra tenía un nombre distinto en la plantilla de configuración y en el código. Correr el DAG con pocos lotes mostró otro: la regla del día de referencia descartaba el 26 de octubre, un día completo, porque suponía que el día del corte siempre estaba cargado. Esos errores solo aparecieron al probar el flujo completo.
 
 \subsection{Limitaciones}
 
@@ -22,6 +22,8 @@ Por último, integrar módulos hechos por separado sacó a la luz errores que no
   \item Neo4j no se carga de forma incremental: el loader exige el archivo completo y las proporciones de cada usuario se calculan sobre todo el lote. La carga incremental es además simulada, porque siempre se lee el mismo archivo.
   \item Cada corrida de MongoDB recorre la colección para reconstruir las huellas y cada corrida de Cassandra relee los lotes ya cargados para recalcular los agregados, así que ambas tareas tardan más a medida que crecen las bases.
   \item Las comunidades dependen de los umbrales del análisis y solo cubren el 23,76~\% de las escuchas, lo que limita lo que se puede concluir sobre la diversidad de los usuarios.
+  \item MetaBrainz retira los incrementales a las pocas semanas. El 2746 ya no se puede descargar, así que reproducir el proyecto depende de conservar el comprimido y su \code{.sha256}.
+  \item El stack completo pide unos 10~GB de memoria. En una laptop de 8~GB funcionó bajando la memoria de las bases y cerrando otras aplicaciones, pero con poca memoria libre la carga de Cassandra necesitó reintentos.
 \end{itemize}
 
 \subsection{Trabajo futuro}

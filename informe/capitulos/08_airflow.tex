@@ -1,7 +1,7 @@
 \section{Explicación del DAG de Airflow}
 \label{cap:airflow}
 
-El DAG \code{music_dna_pipeline} automatiza todo el flujo del proyecto: toma el volcado de ListenBrainz, lo valida, lo carga en MongoDB, Cassandra y Neo4j y al final calcula los KPIs que lee el dashboard \citep{airflow}. Se ejecuta todos los días (\code{@daily}) y en cada corrida agrega un bloque nuevo de escuchas, así se simula que los datos llegan de forma incremental.
+El DAG \code{music_dna_pipeline} automatiza todo el flujo del proyecto: toma el volcado de ListenBrainz, lo valida, lo carga en MongoDB, Cassandra y Neo4j y al final calcula los KPIs \citep{airflow}. Se ejecuta todos los días (\code{@daily}) y en cada corrida agrega un bloque nuevo de escuchas, así se simula que los datos llegan de forma incremental.
 
 El DAG no tiene lógica propia de carga ni de análisis. Cada tarea llama a las funciones que ya están en \code{databases/}, las mismas que se usan por consola, de modo que lo que se probó por separado en cada base es exactamente lo que corre en Airflow. El código está en \code{airflow/dags/music_dna_dag.py}.
 
@@ -16,6 +16,8 @@ Usamos \code{LocalExecutor}: las tareas corren como procesos dentro del contened
 Dentro de los contenedores se montan \code{airflow/dags}, \code{databases}, \code{scripts} y \code{data} en \code{/opt/airflow/}, con \code{PYTHONPATH=/opt/airflow}. Así funcionan los imports \code{databases.mongodb}, \code{databases.cassandra} y \code{databases.neo4j}, y también las rutas de Neo4j, que se calculan desde la raíz del proyecto. Las bases se alcanzan por su nombre de servicio en la red de Docker (\code{mongodb://mongodb:27017/}, \code{CASSANDRA_HOSTS=cassandra}, \code{bolt://neo4j:7687}), no por \code{localhost}. Los servicios de Airflow esperan con \texttt{depends\_on} y \texttt{condition: service\_healthy} a que postgres y las tres bases respondan su healthcheck.
 
 \subsection{Estructura del DAG}
+
+La tabla~\ref{tab:dag-config} resume la configuración del DAG.
 
 \begin{table}[H]
 \centering
@@ -79,7 +81,7 @@ validacion = validar_y_limpiar(extraccion)
 generar_kpis(cargar_mongodb(validacion), cargar_cassandra(validacion), cargar_neo4j(validacion))
 \end{lstlisting}
 
-Cada tarea devuelve un diccionario pequeño (conteos, rutas, banderas) que queda como XCom y se puede revisar en la interfaz. Los datos grandes nunca pasan por XCom: las tareas se comunican a través del archivo y de las bases. Los tamaños de lote se configuran como variables de Airflow, desde la interfaz y sin tocar el código:
+Cada tarea devuelve un diccionario pequeño (conteos, rutas, banderas) que queda como XCom y se puede revisar en la interfaz. Los datos grandes nunca pasan por XCom: las tareas se comunican a través del archivo y de las bases. Los tamaños de lote se configuran como variables de Airflow, desde la interfaz y sin tocar el código (tabla~\ref{tab:dag-variables}).
 
 \begin{table}[H]
 \centering
@@ -155,7 +157,7 @@ Espera a las tres cargas. Ejecuta el análisis de afinidades y comunidades de Ne
 
 \subsection{Carga incremental simulada}
 
-El dataset es un solo archivo, así que la llegada de datos nuevos se simula cargando una parte en cada corrida:
+El dataset es un solo archivo, así que la llegada de datos nuevos se simula cargando una parte en cada corrida, como muestra la tabla~\ref{tab:dag-incremental}.
 
 \begin{table}[H]
 \centering
@@ -194,7 +196,7 @@ Además el grafo responde preguntas de relaciones (afinidades, comunidades, reco
 
 \subsection{Idempotencia y reintentos}
 
-Cada tarea se puede repetir sin dejar datos duplicados, y eso es lo que hace seguros los dos reintentos automáticos:
+Cada tarea se puede repetir sin dejar datos duplicados, y eso es lo que hace seguros los dos reintentos automáticos. La tabla~\ref{tab:dag-idempotencia} detalla qué pasa con cada una.
 
 \begin{table}[H]
 \centering
@@ -230,7 +232,7 @@ Si el dataset no está en \code{data/processed/}, la primera tarea lo descarga. 
 \subsection{Corridas medidas}
 \label{sec:airflow-corridas}
 
-Probamos el pipeline completo dos veces seguidas, con las tres bases vacías al empezar. La laptop tenía Ubuntu 22.04, 4 núcleos y 8~GB de RAM, menos de los 10~GB que pide el compose, así que con un \code{docker-compose.override.yml} local (no versionado) bajamos el heap de Cassandra a 1~GB, el de Neo4j a 1~GB con 512~MB de page cache y la caché de MongoDB a 0,5~GB. La primera corrida se lanzó desde la terminal con \texttt{airflow dags test}, que ejecuta las tareas una tras otra en un solo proceso. La segunda se lanzó desde la interfaz, activando el DAG: el scheduler creó la corrida programada del 14 de noviembre y la ejecutó con \code{LocalExecutor}, con las tres cargas en paralelo.
+Probamos el pipeline completo dos veces seguidas, con las tres bases vacías al empezar. La laptop tenía Ubuntu 22.04, 4 núcleos y 8~GB de RAM, menos de los 10~GB que pide el compose, así que con un \code{docker-compose.override.yml} local (no versionado) bajamos el heap de Cassandra a 1~GB, el de Neo4j a 1~GB con 512~MB de page cache y la caché de MongoDB a 0,5~GB. La primera corrida se lanzó desde la terminal con \texttt{airflow dags test}, que ejecuta las tareas una tras otra en un solo proceso. La segunda se lanzó desde la interfaz, activando el DAG: el scheduler creó la corrida programada del 14 de noviembre y la ejecutó con \code{LocalExecutor}, con las tres cargas en paralelo. La tabla~\ref{tab:airflow-tiempos} muestra la duración de cada tarea.
 
 \begin{table}[H]
 \centering
@@ -253,7 +255,7 @@ Corrida completa & 1\,326,8 & 176 \\
 \nota{En la corrida 1 las tareas corren en serie y el total es la suma. En la corrida 2 las tres cargas van en paralelo y el total es la duración que reporta Airflow (2 minutos y 56 segundos).}
 \end{table}
 
-La primera corrida tarda 22 minutos y casi todo es la carga de Neo4j: 261,7~s de preparación en SQLite y el resto, unos 778~s, de escritura y reconciliación en el grafo. El tiempo de esa tarea varía bastante en esta laptop según la memoria libre; en otra carga completa anterior tardó 569~s. En la segunda corrida Neo4j solo consulta el nodo \code{Lote} y cuenta los totales, y la corrida completa baja a menos de 3 minutos. MongoDB y Cassandra tardan parecido en las dos corridas porque cada una agrega el mismo volumen: 100\,000 documentos y un lote de 500\,000 escuchas.
+La primera corrida tarda 22 minutos y casi todo es la carga de Neo4j: 261,7~s de preparación en SQLite y el resto, unos 778~s, de escritura y reconciliación en el grafo. El tiempo de esa tarea varía bastante en esta laptop según la memoria libre; en otra carga completa anterior tardó 569~s. En la segunda corrida Neo4j solo consulta el nodo \code{Lote} y cuenta los totales, y la corrida completa baja a menos de 3 minutos. MongoDB y Cassandra tardan parecido en las dos corridas porque cada una agrega el mismo volumen: 100\,000 documentos y un lote de 500\,000 escuchas. La tabla~\ref{tab:airflow-conteos} resume el estado de las bases después de cada corrida.
 
 \begin{table}[H]
 \centering

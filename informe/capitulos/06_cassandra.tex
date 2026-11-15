@@ -1,11 +1,11 @@
 \section{Modelo de datos de Cassandra}
 \label{cap:cassandra}
 
-Cassandra guarda las escuchas como serie temporal y las métricas agregadas por fecha que consume el dashboard \citep{cassandra}. MongoDB conserva el documento original y Neo4j las relaciones; aquí está lo que se consulta por tiempo y en volumen. El código está en \code{databases/cassandra/}.
+Cassandra guarda las escuchas como serie temporal y las métricas agregadas por fecha de las que salen los KPIs \citep{cassandra}. MongoDB conserva el documento original y Neo4j las relaciones; aquí está lo que se consulta por tiempo y en volumen. El código está en \code{databases/cassandra/}.
 
 \subsection{Por qué este diseño}
 
-Son 4\,855\,809 escuchas y el DAG puede seguir agregando lotes, así que la base tiene que aceptar escrituras masivas. Las consultas del dashboard se conocen de antemano y son siempre las mismas: actividad por día, ranking del mes, evolución de un artista e historial de un usuario. En Cassandra eso se resuelve con una tabla por consulta (diseño \emph{query-first}), de modo que cada lectura va directo a una sola partición sin importar cuántos datos haya. Dentro de la partición, la clave de clustering deja las filas ordenadas por fecha. El costo es repetir datos entre tablas y no poder hacer consultas ad hoc: si aparece una pregunta nueva, hay que agregar otra tabla.
+Son 4\,855\,809 escuchas y el DAG puede seguir agregando lotes, así que la base tiene que aceptar escrituras masivas. Las consultas que necesitan los KPIs y el dashboard se conocen de antemano y son siempre las mismas: actividad por día, ranking del mes, evolución de un artista e historial de un usuario. En Cassandra eso se resuelve con una tabla por consulta (diseño \emph{query-first}), de modo que cada lectura va directo a una sola partición sin importar cuántos datos haya. Dentro de la partición, la clave de clustering deja las filas ordenadas por fecha. El costo es repetir datos entre tablas y no poder hacer consultas ad hoc: si aparece una pregunta nueva, hay que agregar otra tabla.
 
 \subsection{Tablas}
 
@@ -56,7 +56,7 @@ CREATE TABLE IF NOT EXISTS music_dna.daily_stats (
 );
 \end{lstlisting}
 
-Tres decisiones del modelo merecen explicación:
+En el modelo tomamos tres decisiones que conviene explicar:
 
 \begin{itemize}
   \item \code{listens_by_user} se particiona por usuario y mes, no solo por usuario. Así una partición no crece sin límite: la más grande del dataset tiene 14\,205 filas. Particionar solo por usuario habría acumulado todo el historial de los usuarios más activos en una sola partición.
@@ -88,7 +88,7 @@ Hicieron falta tres optimizaciones:
 
 \subsection{Resultados de la carga completa}
 
-Las mediciones se hicieron en un notebook con Windows~11, 20~GB de RAM y Cassandra~5.0 en Docker (un nodo, heap de 2~GB), cargando el archivo completo del incremental 2746 con las tablas vacías.
+Las mediciones se hicieron en una laptop con Windows~11, 20~GB de RAM y Cassandra~5.0 en Docker (un nodo, heap de 2~GB), cargando el archivo completo del incremental 2746 con las tablas vacías. La tabla~\ref{tab:cassandra-tiempos} muestra los tiempos y la tabla~\ref{tab:cassandra-filas}, las filas que quedaron en cada tabla.
 
 \begin{table}[H]
 \centering
@@ -129,7 +129,7 @@ El total se comprobó de tres formas independientes: la suma de \code{load_batch
 
 \subsection{Operaciones CRUD}
 
-El CRUD está en \code{databases/cassandra/crud.py} y trabaja sobre \code{listens_by_user}, donde una fila es una escucha. Como \code{month} se calcula a partir de \code{listened_at}, para ubicar una escucha basta con \code{user_id}, \code{listened_at} y \code{listen_id}.
+El CRUD está en \code{databases/cassandra/crud.py} y trabaja sobre \code{listens_by_user}, donde una fila es una escucha. Como \code{month} se calcula a partir de \code{listened_at}, para ubicar una escucha basta con \code{user_id}, \code{listened_at} y \code{listen_id}. La tabla~\ref{tab:cassandra-crud} resume las funciones.
 
 \begin{table}[H]
 \centering
@@ -162,7 +162,7 @@ La demostración (\code{python -m databases.cassandra.crud --step}) usa el usuar
 
 \subsection{Consultas}
 
-\code{databases/cassandra/queries.py} tiene una función por consulta y todas devuelven listas de diccionarios, que el dashboard puede convertir directamente en tablas. Cada una lee una sola partición:
+\code{databases/cassandra/queries.py} tiene una función por consulta y todas devuelven listas de diccionarios, que se pueden convertir directamente en tablas. Cada una lee una sola partición; la tabla~\ref{tab:cassandra-consultas} las resume con los tiempos medidos.
 
 \begin{table}[H]
 \centering

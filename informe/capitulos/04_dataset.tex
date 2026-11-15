@@ -48,6 +48,8 @@ Cada línea del archivo es un objeto JSON que representa una escucha, con la est
 }
 \end{lstlisting}
 
+La tabla~\ref{tab:campos} describe cada campo.
+
 \begin{table}[H]
 \centering
 \caption{Campos de una escucha}
@@ -68,7 +70,7 @@ Campo & Significado & Observaciones \\
 \end{tabularx}
 \end{table}
 
-Los cuatro últimos campos están anidados dentro de \code{track_metadata}. La diferencia entre \code{timestamp} y \code{listened_at} es importante: algunas respuestas de la API de ListenBrainz usan \code{listened_at} \citep{listenbrainzjson}, pero el archivo descargado usa \code{timestamp}, y todos los scripts del repositorio están adaptados a ese formato.
+Los cuatro últimos campos están anidados dentro de \code{track_metadata}. Conviene no confundir \code{timestamp} con \code{listened_at}: algunas respuestas de la API de ListenBrainz usan \code{listened_at} \citep{listenbrainzjson}, pero el archivo descargado usa \code{timestamp}, y todos los scripts del repositorio están adaptados a ese formato.
 
 \subsection{Volumen y exploración}
 

@@ -1,15 +1,15 @@
 \section{Dashboard analítico}
 \label{cap:dashboard}
 
-El dashboard se construye con Streamlit \citep{streamlit} y se conecta a las tres bases. Para los indicadores no recalcula nada: lee el snapshot que deja Airflow, ya sea el archivo \code{data/airflow/kpis_latest.json} o el último documento de la colección \code{kpi_runs} de MongoDB. Así el dashboard muestra exactamente los mismos valores que calculó el pipeline, y si se consulta \code{kpi_runs} completa, ordenada por \code{generado_en}, también puede mostrar cómo cambian los indicadores entre corridas.
+El dashboard está diseñado para Streamlit \citep{streamlit} y para conectarse a las tres bases. La decisión principal del diseño es que no recalcula los indicadores: toma el snapshot que deja Airflow, ya sea el archivo \code{data/airflow/kpis_latest.json} o el último documento de la colección \code{kpi_runs} de MongoDB. Así muestra los mismos valores que calculó el pipeline (tabla~\ref{tab:kpis-valores}). Leyendo \code{kpi_runs} completa, ordenada por \code{generado_en}, puede mostrar además cómo cambian los indicadores entre corridas; después de las dos corridas medidas la colección tiene dos snapshots (figura~\ref{fig:kpi-runs}).
 
-Para las vistas de detalle consulta cada base con las funciones que ya existen en \code{databases/}: las de \code{queries.py} de Cassandra, que devuelven listas de diccionarios fáciles de convertir en tablas, las consultas de grafo de Neo4j y las agregaciones de MongoDB.
+Para las vistas de detalle se usan las funciones que ya existen en \code{databases/}: las de \code{queries.py} de Cassandra, que devuelven listas de diccionarios fáciles de convertir en tablas, las consultas de grafo de Neo4j y las agregaciones de MongoDB. El dashboard no necesita lógica de acceso a datos propia.
 
-La tabla~\ref{tab:dashboard} relaciona cada indicador con la visualización que le corresponde y con su fuente.
+La tabla~\ref{tab:dashboard} relaciona cada indicador con la visualización prevista y con su fuente.
 
 \begin{table}[H]
 \centering
-\caption{Visualización de cada indicador en el dashboard}
+\caption{Diseño de la visualización de cada indicador}
 \label{tab:dashboard}
 \begin{tabularx}{\textwidth}{l Y Y}
 \toprule

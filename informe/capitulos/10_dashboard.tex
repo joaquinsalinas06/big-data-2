@@ -1,91 +1,89 @@
 \section{Dashboard analítico}
 \label{cap:dashboard}
 
-El dashboard está diseñado para Streamlit \citep{streamlit} y para conectarse a las tres bases. La decisión principal del diseño es que no recalcula los indicadores: toma el snapshot que deja Airflow, ya sea el archivo \code{data/airflow/kpis_latest.json} o el último documento de la colección \code{kpi_runs} de MongoDB. Así muestra los mismos valores que calculó el pipeline (tabla~\ref{tab:kpis-valores}). Leyendo \code{kpi_runs} completa, ordenada por \code{generado_en}, puede mostrar además cómo cambian los indicadores entre corridas; después de las dos corridas medidas la colección tiene dos snapshots (figura~\ref{fig:kpi-runs}).
+El dashboard está desarrollado sobre Streamlit \citep{streamlit} y se conecta directamente a los tres motores de almacenamiento de la arquitectura. La decisión principal del diseño es que no recalcula de forma redundante los indicadores: consume el snapshot generado por la etapa \code{generar_kpis} de Apache Airflow, disponible tanto en el archivo \code{data/airflow/kpis_latest.json} como en el último documento de la colección \code{kpi_runs} de MongoDB. De este modo, la interfaz refleja con exactitud los valores calculados por el pipeline (tabla~\ref{tab:kpis-valores}). Al consultar la colección \code{kpi_runs} ordenada por \code{generado_en}, se despliega además la evolución de los indicadores entre corridas sucesivas del flujo.
 
-Para las vistas de detalle se usan las funciones que ya existen en \code{databases/}: las de \code{queries.py} de Cassandra, que devuelven listas de diccionarios fáciles de convertir en tablas, las consultas de grafo de Neo4j y las agregaciones de MongoDB. El dashboard no necesita lógica de acceso a datos propia.
+Para las vistas especializadas y las consultas en vivo, la interfaz reutiliza las funciones implementadas en los módulos de cada base de datos: las consultas optimizadas de \code{databases/cassandra/queries.py}, los patrones de grafo y algoritmos de Louvain/Jaccard de \code{databases/neo4j/queries.py}, y las consultas indexadas de \code{databases/mongodb/queries.py}.
 
-La tabla~\ref{tab:dashboard} relaciona cada indicador con la visualización prevista y con su fuente.
+La tabla~\ref{tab:dashboard} relaciona cada indicador con la visualización implementada en el dashboard y su fuente de extracción.
 
 \begin{table}[H]
 \centering
-\caption{Diseño de la visualización de cada indicador}
+\caption{Diseño de la visualización de cada indicador en el dashboard}
 \label{tab:dashboard}
 \begin{tabularx}{\textwidth}{l Y Y}
 \toprule
 Indicador & Visualización & Fuente \\
 \midrule
-Escuchas por día & Tarjeta con el valor del día de referencia y gráfico de líneas de la serie diaria & \code{kpis.escuchas_por_dia} y \code{serie_diaria} \\
-Crecimiento diario & Tarjeta con el porcentaje y gráfico de barras del crecimiento de cada día & \code{kpis.crecimiento_diario_pct} y \code{serie_diaria} \\
-Escuchas por usuario activo & Tarjeta con el promedio y los usuarios activos del día & \code{kpis.escuchas_por_usuario_activo} \\
-Participación del artista líder & Tarjeta con el artista y su porcentaje, y gráfico de barras del top del mes & \code{kpis.participacion_artista_lider} y \code{get_top_artists} de Cassandra \\
-Entidad con más conexiones & Tarjeta con el artista y su número de oyentes, y tabla de comunidades del grafo & \code{kpis.entidad_mas_conectada} y consultas de Neo4j \\
-Seguimiento de la carga & Evolución de los documentos en MongoDB y de los lotes de Cassandra por corrida & \code{seguimiento} en \code{kpi_runs} \\
+Escuchas por día & Tarjeta con el total procesado en $d^{*}$ y gráfico de barras/líneas de la serie diaria & \code{kpis.escuchas_por_dia} y \code{serie_diaria} \\
+Crecimiento diario & Tarjeta con el porcentaje y curva interdiaria con marcadores & \code{kpis.crecimiento_diario_pct} y \code{serie_diaria} \\
+Escuchas por usuario activo & Tarjeta con el cociente del día y conteo de usuarios activos & \code{kpis.escuchas_por_usuario_activo} \\
+Participación del artista líder & Tarjeta con el porcentaje del líder y gráfico horizontal de participación mensual & \code{kpis.participacion_artista_lider} y \code{get_top_artists} \\
+Entidad con más conexiones & Tarjeta con el artista de mayor audiencia transversal y grado de entrada & \code{kpis.entidad_mas_conectada} y consultas Neo4j \\
+Seguimiento de la carga & Tarjetas métricas de volumen y tabla comparativa de lotes de Airflow & \code{seguimiento} y colección \code{kpi_runs} \\
 \bottomrule
 \end{tabularx}
 \end{table}
 
-La serie diaria del snapshot cubre los últimos 30 días del año de referencia. Al graficarla hay que mostrar la advertencia de la sección~\ref{cap:kpis}: los saltos de fines de octubre se deben a la forma en que llegó la ingesta al incremental, no a un cambio real en la cantidad de música escuchada.
+La serie diaria desplegada cubre los últimos 30 días del periodo de referencia. Como se detalla en la sección~\ref{cap:kpis}, el incremento abrupto al cierre de octubre corresponde a la acumulación de sincronizaciones de clientes en la ventana previa al corte del volcado incremental, y no a una anomalía funcional en el pipeline.
 
-\subsection{Arquitectura de la aplicación y experiencia de usuario}
+\subsection{Estructura de la aplicación y experiencia de usuario}
 
-La interfaz se implementó siguiendo un esquema modular basado en pestañas (\code{st.tabs}), organizado bajo la carpeta \code{dashboard/}. La navegación se estructura en cinco módulos principales:
+La interfaz se organizó siguiendo un esquema modular basado en pestañas (\code{st.tabs}) en la carpeta \code{dashboard/}, estructurada en cinco secciones principales:
 \begin{enumerate}
-    \item \textbf{Inicio / Estado General (\code{views/home.py}):} Diagnóstico de conectividad de los tres motores de bases de datos, despliegue de las tarjetas métricas de los cinco KPIs para el día de referencia $d^{*}$, selector interactivo para la serie diaria de los últimos 30 días, gráfica horizontal de concentración del top de artistas del mes y panel de seguimiento del pipeline.
-    \item \textbf{MongoDB (\code{views/mongodb_view.py}):} Explorador documental de eventos crudos de escucha con filtros interactivos por texto y visualizador JSON interactivo del esquema semiestructurado y metadatos anidados.
-    \item \textbf{Cassandra (\code{views/cassandra_view.py}):} Análisis de series temporales con gráficos de líneas de evolución mensual, distribución horaria de actividad (horas pico UTC) y ranking de usuarios más activos.
-    \item \textbf{Neo4j (\code{views/neo4j_view.py}):} Visualización de las comunidades musicales detectadas por el algoritmo de Louvain, métricas de intermediación (\textit{betweenness centrality}) para la identificación de artistas puente y un motor de recomendación explicable basado en coescuchas compartidas (índice de Jaccard).
-    \item \textbf{Fichas de KPIs (\code{views/kpis_view.py}):} Fichas técnicas formales de los cinco indicadores con su formulación matemática rigurosa en \LaTeX, fuentes de extracción e interpretación analítica.
+    \item \textbf{Resumen General (\code{views/home.py}):} Despliegue prioritario de las cinco tarjetas métricas de los KPIs oficiales para el día de corte ($2026\text{-}10\text{-}26$), selector interactivo de la serie diaria (volumen, tasa de crecimiento y usuarios activos), gráfico horizontal del top de artistas del mes y panel de métricas operativas de la carga ETL.
+    \item \textbf{MongoDB (\code{views/mongodb_view.py}):} Explorador documental con filtro dinámico por texto en artista, canción o usuario, visualizador estructurado en tabla, visor del documento JSON crudo y subpanel interactivo para la demostración de operaciones CRUD (\code{insert_one}, \code{find_one}, \code{update_one}, \code{delete_one}).
+    \item \textbf{Cassandra (\code{views/cassandra_view.py}):} Análisis de series temporales (evolución mensual 2026, distribución horaria UTC y usuarios activos), consola de consultas CQL interactivas con medición de latencia en milisegundos y subpanel de demostración CRUD sobre la tabla particionada \code{listens_by_user}.
+    \item \textbf{Neo4j (\code{views/neo4j_view.py}):} Mapeo de comunidades de Louvain, artistas puente por intermediación, sistema interactivo de recomendaciones por similitud de Jaccard, consola de consultas analíticas Cypher y subpanel de demostración CRUD de creación y eliminación de nodos y relaciones.
+    \item \textbf{Fichas de KPIs (\code{views/kpis_view.py}):} Especificación metodológica formal de los cinco indicadores con formulación matemática en \LaTeX, tablas de referencia e interpretación analítica de resultados.
 \end{enumerate}
 
-Para garantizar una experiencia de usuario sobria y académica, el diseño prescinde por completo de emoticonos o elementos lúdicos, empleando una tipografía limpia (\textit{Inter} / \textit{system-ui}), contenedores con sombras suaves y una paleta de colores claros dominada por azules marinos (\texttt{\#1e3a8a}), azules de contraste (\texttt{\#2563eb}) y fondos gris pizarra (\texttt{\#f8fafc}).
+Para garantizar una presentación sobria y adecuada para un proyecto de ingeniería de datos, el diseño omite emoticonos y elementos decorativos innecesarios. Se forzó una configuración de tema claro con tipografía en tonos oscuros (\texttt{\#0f172a}), contenedores con bordes sutiles y fondos claros (\texttt{\#f8fafc}).
 
-Asimismo, el servicio de conectividad (\code{dashboard/services.py}) implementa una verificación ultrarrápida de sockets locales sobre los puertos 27017, 9042 y 7687 con un tiempo límite de 250~ms. Si los contenedores Docker no se encuentran activos en el entorno local, el sistema activa automáticamente un modo resiliente con datos de referencia calibrados del volcado 2746, garantizando que el evaluador pueda navegar y auditar la interfaz sin bloqueos ni tiempos muertos.
+Asimismo, el servicio de conectividad (\code{dashboard/services.py}) implementa una verificación mediante sockets locales sobre los puertos 27017, 9042 y 7687 con un tiempo límite de 150~ms. Esto previene bloqueos por tiempos de espera prolongados en la interfaz web si los contenedores Docker se encuentran detenidos, conmutando de forma transparente al snapshot local validado de Airflow.
 
 \subsection{Vista de inicio y despliegue de indicadores}
 
-La figura~\ref{fig:dashboard-general} muestra la pantalla de inicio del dashboard analítico. En la parte superior se observa el diagnóstico en línea de los motores de persistencia. Inmediatamente debajo se ubican las cinco tarjetas correspondientes a los KPIs oficiales para el día de referencia 26 de octubre de 2026: 1\,359\,824 escuchas procesadas, $+3\,364$~\% de crecimiento diario, 52,3 escuchas por usuario activo ($26\,020$ usuarios), 12,65~\% de participación para BTS y 1\,137 oyentes únicos para Linkin Park.
+La figura~\ref{fig:dashboard-general} ilustra la pantalla de inicio del dashboard analítico. En la parte superior se observa el encabezado sobrio y las cinco tarjetas con los valores consolidados del día de referencia (26 de octubre de 2026): 1\,359\,824 escuchas procesadas, $+3\,364{,}0$~\% de crecimiento diario, 52,3 escuchas por usuario activo (26\,020 usuarios), 12,65~\% de participación para BTS y 1\,137 oyentes únicos para Linkin Park.
 
 \begin{figure}[H]
 \caption{Vista de inicio del dashboard analítico con los cinco KPIs oficiales}
 \label{fig:dashboard-general}
 \centering
 \includegraphics[width=\textwidth]{figuras/dashboard_general.png}
-\nota{La interfaz muestra el diagnóstico de los tres motores, las cinco tarjetas de KPIs para el día de referencia, la serie diaria con selector de métrica y el top de artistas de octubre.}
+\nota{La interfaz presenta las cinco tarjetas de KPIs, la serie diaria con selector de métrica, el ranking mensual de artistas y el estado de los motores en el panel lateral.}
 \end{figure}
 
-El panel central integra un selector interactivo que permite alternar la serie temporal de los últimos 30 días entre volumen diario, tasa de crecimiento interdiario y usuarios activos. A la derecha, un gráfico de barras horizontales desglosa la participación porcentual del top de artistas del mes de referencia, evidenciando el liderazgo de BTS frente a Taylor Swift, Linkin Park y Charli xcx.
+El panel central integra el selector de métrica para la serie temporal diaria y el gráfico de barras horizontales con el porcentaje de participación del catálogo mensual. Debajo se sitúa el resumen operativo del pipeline de Airflow (10 lotes procesados, 4\,855\,809 escuchas válidas y 1,83~\% de descarte por limpieza) junto con la tabla comparativa de corridas extraída de \code{kpi_runs}.
 
-En la sección inferior se despliegan las métricas de seguimiento de la carga incremental (4\,000\,000 de documentos en MongoDB, 10 lotes y 4\,855\,809 escuchas en Cassandra, modularidad ponderada de 0,7825 en Neo4j) y la tabla comparativa que refleja cómo evolucionan los indicadores a través de las corridas del DAG registradas en la colección \code{kpi_runs}.
+\subsection{Vistas especializadas y consolas interactivas}
 
-\subsection{Vistas especializadas de persistencia}
-
-La figura~\ref{fig:dashboard-cassandra} ilustra la vista analítica especializada en Cassandra. En ella se combinan gráficos interactivos desarrollados en Plotly que contrastan la evolución mensual de reproducciones con la distribución horaria de actividad en horario UTC. El análisis horario evidencia un pico sostenido de consumo entre las 16:00 y las 20:00 UTC (alcanzando 389\,000 escuchas a las 18:00 UTC), representativo del horario vespertino en Europa y América.
+La figura~\ref{fig:dashboard-cassandra} muestra la vista analítica de Cassandra. Combina gráficos interactivos de la evolución mensual y el perfil horario en UTC con una consola interactiva de consultas CQL. El usuario puede seleccionar consultas preparadas (como el top de artistas o las estadísticas anuales), visualizar la sentencia CQL correspondiente y ejecutarla en vivo con medición del tiempo de respuesta.
 
 \begin{figure}[H]
-\caption{Vista especializada de Cassandra: series temporales y distribución horaria}
+\caption{Vista especializada de Cassandra: series temporales y consola interactiva CQL}
 \label{fig:dashboard-cassandra}
 \centering
 \includegraphics[width=\textwidth]{figuras/dashboard_cassandra.png}
-\nota{Evolución mensual de reproducciones, distribución horaria agregada en UTC y desglose de la estrategia de particionamiento tabular.}
+\nota{Evolución temporal, distribución horaria UTC, consola de consultas CQL y panel de demostración CRUD.}
 \end{figure}
 
-En la figura~\ref{fig:dashboard-neo4j} se expone el módulo de análisis de redes y grafos conectado a Neo4j. La tabla superior resume las comunidades musicales detectadas por el algoritmo de Louvain, complementada por un gráfico de barras de audiencia por clúster. La sección inferior incorpora un motor interactivo de recomendaciones explicables que permite seleccionar un artista canónico y visualizar recomendaciones ponderadas por el coeficiente de similitud de Jaccard y su comunidad de pertenencia.
+En la figura~\ref{fig:dashboard-neo4j} se expone el módulo de grafos en Neo4j. En su consola de consultas Cypher, se observa la ejecución de la consulta de artistas con mayor cantidad de oyentes únicos (\code{list_artists}), reportando una latencia de 157{,}0~ms y confirmando a Linkin Park con 1\,137 oyentes en el primer lugar. Las otras pestañas del módulo permiten explorar las comunidades de Louvain, los artistas puente y el motor de recomendaciones por similitud de Jaccard.
 
 \begin{figure}[H]
-\caption{Vista especializada de Neo4j: comunidades de Louvain y recomendador explicable}
+\caption{Vista de Neo4j: consola de consultas Cypher y análisis de relaciones}
 \label{fig:dashboard-neo4j}
 \centering
 \includegraphics[width=\textwidth]{figuras/dashboard_neo4j.png}
-\nota{Comunidades del grafo, identificación de artistas puente y sistema de recomendación explicable con coeficientes de Jaccard.}
+\nota{Ejecución de consultas Cypher en vivo con medición de latencia, comunidades Louvain y recomendador explicable.}
 \end{figure}
 
-Por último, la figura~\ref{fig:dashboard-kpis} presenta el módulo de fichas técnicas de los KPIs, diseñado específicamente para cumplir los criterios de rigor metodológico exigidos en el curso, exponiendo las fórmulas matemáticas KaTeX y la tabla comparativa de los valores calculados a lo largo de las distintas corridas de Airflow.
+Finalmente, la figura~\ref{fig:dashboard-kpis} presenta el módulo de fichas técnicas formales de los cinco KPIs, estructurado según los requerimientos de la Sección~6 de las instrucciones del proyecto grupal, detallando para cada indicador su definición conceptual, fórmula matemática y análisis técnico, junto con la tabla comparativa por lotes de Airflow.
 
 \begin{figure}[H]
 \caption{Módulo de fichas técnicas formales de los 5 KPIs}
 \label{fig:dashboard-kpis}
 \centering
 \includegraphics[width=\textwidth]{figuras/dashboard_kpis.png}
-\nota{Fichas técnicas con fórmulas matemáticas en KaTeX, fuentes de datos, interpretación y tabla comparativa por lotes de Airflow.}
+\nota{Fichas técnicas con formulación matemática, fuentes de datos, interpretación analítica y comparativa de lotes.}
 \end{figure}

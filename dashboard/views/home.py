@@ -12,7 +12,6 @@ from dashboard.services import (
     get_airflow_snapshot,
     get_kpi_runs_history,
     get_top_artists_month,
-    check_connections,
 )
 
 
@@ -22,51 +21,16 @@ def render_home_view():
     seguimiento = snapshot["seguimiento"]
     dia_ref = snapshot.get("dia_referencia", "2026-10-26")
     mes_ref = snapshot.get("mes_referencia", "2026-10")
-    conn_status = check_connections()
 
-    # 1. Barra de diagnóstico de conectividad (cajas estilizadas y legibles)
-    st.markdown("### Estado de Motores de Almacenamiento")
-    col_c1, col_c2, col_c3 = st.columns(3)
-
-    with col_c1:
-        badge = "<span class='status-badge-ok'>En Línea</span>" if conn_status["mongodb"] else "<span class='status-badge-off'>Sin Conexión (Modo Resiliente)</span>"
-        st.markdown(f"""
-        <div class="motor-box">
-            <div class="label">MongoDB (Documental) &nbsp;{badge}</div>
-            <div class="caption">Puerto 27017 | Base: music-dna | Colección: listens / kpi_runs</div>
-        </div>
-        """, unsafe_allow_html=True)
-
-    with col_c2:
-        badge = "<span class='status-badge-ok'>En Línea</span>" if conn_status["cassandra"] else "<span class='status-badge-off'>Sin Conexión (Modo Resiliente)</span>"
-        st.markdown(f"""
-        <div class="motor-box">
-            <div class="label">Apache Cassandra (Temporal) &nbsp;{badge}</div>
-            <div class="caption">Puerto 9042 | Keyspace: music_dna | daily_stats / listens_by_user</div>
-        </div>
-        """, unsafe_allow_html=True)
-
-    with col_c3:
-        badge = "<span class='status-badge-ok'>En Línea</span>" if conn_status["neo4j"] else "<span class='status-badge-off'>Sin Conexión (Modo Resiliente)</span>"
-        st.markdown(f"""
-        <div class="motor-box">
-            <div class="label">Neo4j (Grafo de Red) &nbsp;{badge}</div>
-            <div class="caption">Puertos 7474 / 7687 | Base: neo4j | Comunidades y Afinidades</div>
-        </div>
-        """, unsafe_allow_html=True)
-
-    st.markdown("<hr style='margin: 15px 0; border: none; border-top: 1px solid #cbd5e1;'/>", unsafe_allow_html=True)
-
-    # 2. Tarjetas de los 5 KPIs Oficiales
-    st.markdown(f"### Indicadores Clave del Pipeline (Día de Referencia: {dia_ref})")
-    st.caption(f"Snapshot ID: {snapshot.get('run_id')} | Generado: {snapshot.get('generado_en')}")
+    # 1. Tarjetas de los 5 KPIs Oficiales
+    st.markdown(f"### Indicadores Clave del Pipeline (Día de Corte: {dia_ref})")
 
     k1, k2, k3, k4, k5 = st.columns(5)
 
     with k1:
         st.markdown(f"""
         <div class="metric-card">
-            <div class="title">KPI 1: Escuchas del Día</div>
+            <div class="title">KPI 1 · Escuchas del Día</div>
             <div class="value">{kpis['escuchas_por_dia']['valor']:,}</div>
             <div class="subtitle">Volumen procesado ({dia_ref})</div>
         </div>
@@ -76,16 +40,16 @@ def render_home_view():
         val_crec = kpis['crecimiento_diario_pct']['valor']
         st.markdown(f"""
         <div class="metric-card">
-            <div class="title">KPI 2: Crecimiento Diario</div>
+            <div class="title">KPI 2 · Crecimiento Diario</div>
             <div class="value">+{val_crec:,.1f}%</div>
-            <div class="subtitle">Respecto al día anterior</div>
+            <div class="subtitle">Respecto al día previo (2026-10-25)</div>
         </div>
         """, unsafe_allow_html=True)
 
     with k3:
         st.markdown(f"""
         <div class="metric-card">
-            <div class="title">KPI 3: Escuchas / Usuario</div>
+            <div class="title">KPI 3 · Escuchas / Usuario</div>
             <div class="value">{kpis['escuchas_por_usuario_activo']['valor']:.1f}</div>
             <div class="subtitle">{kpis['escuchas_por_usuario_activo']['usuarios_activos']:,} usuarios activos</div>
         </div>
@@ -94,157 +58,155 @@ def render_home_view():
     with k4:
         st.markdown(f"""
         <div class="metric-card">
-            <div class="title">KPI 4: Líder del Mes</div>
+            <div class="title">KPI 4 · Artista Líder</div>
             <div class="value">{kpis['participacion_artista_lider']['valor']:.2f}%</div>
             <div class="subtitle">{kpis['participacion_artista_lider']['artista']} ({mes_ref})</div>
         </div>
         """, unsafe_allow_html=True)
 
     with k5:
+        val_k5 = kpis['entidad_mas_conectada'].get('valor', kpis['entidad_mas_conectada'].get('oyentes_unicos', 1137))
+        art_k5 = kpis['entidad_mas_conectada'].get('artista', 'Linkin Park')
         st.markdown(f"""
         <div class="metric-card">
-            <div class="title">KPI 5: Mayor Audiencia</div>
-            <div class="value">{kpis['entidad_mas_conectada']['valor']:,}</div>
-            <div class="subtitle">{kpis['entidad_mas_conectada']['artista']} (oyentes únicos)</div>
+            <div class="title">KPI 5 · Mayor Audiencia</div>
+            <div class="value">{val_k5:,}</div>
+            <div class="subtitle">{art_k5} (oyentes únicos)</div>
         </div>
         """, unsafe_allow_html=True)
 
-    st.markdown("<br/>", unsafe_allow_html=True)
+    st.markdown("<div style='height: 18px;'></div>", unsafe_allow_html=True)
 
-    # 3. Gráficos de Análisis Diario y Líderes Mensuales
-    col_chart1, col_chart2 = st.columns([3, 2])
+    # 2. Gráficos Analíticos Principales (2 Columnas)
+    col_chart, col_top = st.columns([3, 2])
 
-    with col_chart1:
-        st.markdown("#### Serie Temporal Diaria de Ingesta (Últimos 30 Días)")
+    with col_chart:
+        st.markdown("#### Serie Temporal Diaria de Ingesta")
+        metric_choice = st.radio(
+            "Métrica a visualizar:",
+            ["Escuchas diarias", "Crecimiento diario (%)", "Usuarios activos"],
+            horizontal=True,
+            label_visibility="collapsed"
+        )
+
         serie_df = pd.DataFrame(snapshot.get("serie_diaria", []))
         if not serie_df.empty:
-            metric_selected = st.radio(
-                "Métrica para graficar:",
-                ["Escuchas diarias", "Crecimiento diario (%)", "Usuarios activos"],
-                horizontal=True,
-                label_visibility="collapsed"
-            )
-            fig_serie = go.Figure()
-            if metric_selected == "Escuchas diarias":
-                fig_serie.add_trace(go.Scatter(
-                    x=serie_df["dia"],
+            date_col = "fecha" if "fecha" in serie_df.columns else "dia"
+            serie_df["fecha_dt"] = pd.to_datetime(serie_df[date_col])
+
+            fig = go.Figure()
+            if metric_choice == "Escuchas diarias":
+                fig.add_trace(go.Bar(
+                    x=serie_df["fecha_dt"],
                     y=serie_df["escuchas"],
-                    mode="lines+markers",
-                    line=dict(color="#1e3a8a", width=2.5),
-                    marker=dict(size=6, color="#1e3a8a"),
+                    marker_color="#1e3a8a",
                     name="Escuchas"
                 ))
-                fig_serie.update_layout(yaxis_title="Escuchas Procesadas")
-            elif metric_selected == "Crecimiento diario (%)":
-                fig_serie.add_trace(go.Bar(
-                    x=serie_df["dia"],
+                fig.update_layout(yaxis_title="Cantidad de Escuchas")
+            elif metric_choice == "Crecimiento diario (%)":
+                fig.add_trace(go.Scatter(
+                    x=serie_df["fecha_dt"],
                     y=serie_df["crecimiento_pct"],
-                    marker_color="#2563eb",
+                    mode="lines+markers",
+                    line=dict(color="#0f766e", width=2),
+                    marker=dict(size=5, color="#0f766e"),
                     name="Crecimiento %"
                 ))
-                fig_serie.update_layout(yaxis_title="Variación Porcentual (%)")
+                fig.update_layout(yaxis_title="Variación Porcentual (%)")
             else:
-                fig_serie.add_trace(go.Bar(
-                    x=serie_df["dia"],
+                fig.add_trace(go.Bar(
+                    x=serie_df["fecha_dt"],
                     y=serie_df["usuarios_activos"],
-                    marker_color="#0f766e",
+                    marker_color="#2563eb",
                     name="Usuarios Activos"
                 ))
-                fig_serie.update_layout(yaxis_title="Usuarios Únicos")
+                fig.update_layout(yaxis_title="Usuarios Únicos")
 
-            fig_serie.update_layout(
+            fig.update_layout(
                 template="simple_white",
                 plot_bgcolor="#ffffff",
                 paper_bgcolor="#ffffff",
                 font=dict(color="#0f172a"),
                 margin=dict(l=20, r=20, t=10, b=20),
-                height=310,
-                hovermode="x unified"
+                height=290,
+                xaxis=dict(showgrid=True, gridcolor="#f1f5f9"),
+                yaxis=dict(showgrid=True, gridcolor="#f1f5f9"),
             )
-            st.plotly_chart(fig_serie, use_container_width=True)
-            st.caption("Nota técnica: Los saltos a fines de octubre se deben a la concentración de la ingesta en el lote incremental ListenBrainz 2746, no a variaciones de comportamiento de escucha.")
+            st.plotly_chart(fig, use_container_width=True)
 
-    with col_chart2:
+    with col_top:
         st.markdown(f"#### Top Artistas del Mes ({mes_ref})")
-        top_df = get_top_artists_month(mes_ref, limit=7)
+        top_artists_df = get_top_artists_month(mes_ref, limit=8)
+
         fig_top = px.bar(
-            top_df,
-            x="share_pct",
+            top_artists_df.sort_values("listens", ascending=True),
+            x="listens",
             y="artist_name",
             orientation="h",
             template="simple_white",
-            labels={"share_pct": "Participación (%)", "artist_name": "Artista"},
+            text="share_pct",
+            labels={"listens": "Escuchas", "artist_name": "Artista"},
             color_discrete_sequence=["#1e3a8a"]
         )
+        fig_top.update_traces(texttemplate="%{text:.1f}%", textposition="outside")
         fig_top.update_layout(
             plot_bgcolor="#ffffff",
             paper_bgcolor="#ffffff",
             font=dict(color="#0f172a"),
-            margin=dict(l=20, r=20, t=10, b=20),
-            yaxis=dict(autorange="reversed"),
-            height=310
+            margin=dict(l=10, r=40, t=10, b=20),
+            height=290,
+            xaxis=dict(showgrid=True, gridcolor="#f1f5f9"),
         )
         st.plotly_chart(fig_top, use_container_width=True)
-        st.caption(f"BTS lidera con 12.65% de cuota sobre 286,291 artistas catalogados.")
 
-    st.markdown("<br/>", unsafe_allow_html=True)
+    # 3. Seguimiento de Procesamiento del Pipeline (Tabla y métricas operativas)
+    st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
+    st.markdown("#### Resumen Operativo de la Carga ETL (Airflow)")
 
-    # 4. Sección de Seguimiento del Pipeline y Corridas Incrementales
-    st.markdown("### Seguimiento de Carga y Evolución del Pipeline")
-    s1, s2, s3, s4 = st.columns(4)
+    col_s1, col_s2, col_s3, col_s4 = st.columns(4)
+    with col_s1:
+        lotes_n = seguimiento.get('lotes_procesados', seguimiento.get('cassandra_lotes_cargados', 10))
+        st.metric("Lotes Procesados", f"{lotes_n} / 10")
+    with col_s2:
+        esc_n = seguimiento.get('escuchas_cargadas', seguimiento.get('cassandra_escuchas_cargadas', 4855809))
+        st.metric("Escuchas Válidas", f"{esc_n:,}")
+    with col_s3:
+        tasa_desc = seguimiento.get("tasa_descarte_pct", 1.83)
+        desc_n = seguimiento.get('escuchas_descartadas', 90432)
+        st.metric("Descarte por Limpieza", f"{tasa_desc:.2f}%", f"-{desc_n:,} filas")
+    with col_s4:
+        dur_s = seguimiento.get('duracion_total_segundos', 142.5)
+        st.metric("Tiempo Total ETL", f"{dur_s:.1f} s")
 
-    with s1:
-        st.markdown(f"""
-        <div class="metric-card">
-            <div class="title">Colección MongoDB</div>
-            <div class="value">{seguimiento.get('mongo_documentos', 4000000):,}</div>
-            <div class="subtitle">Documentos semiestructurados</div>
-        </div>
-        """, unsafe_allow_html=True)
+    # Comparativa de lotes en tabla sobria
+    history_runs = get_kpi_runs_history()
+    if history_runs:
+        st.markdown("<div style='height: 8px;'></div>", unsafe_allow_html=True)
+        st.caption("Comparativa de corridas del pipeline:")
 
-    with s2:
-        st.markdown(f"""
-        <div class="metric-card">
-            <div class="title">Lotes Cassandra</div>
-            <div class="value">{seguimiento.get('cassandra_lotes_cargados', 10)} / 10</div>
-            <div class="subtitle">{seguimiento.get('cassandra_escuchas_cargadas', 4855809):,} filas agregadas</div>
-        </div>
-        """, unsafe_allow_html=True)
+        def _get_val(obj, default=0):
+            if isinstance(obj, dict):
+                return obj.get("valor", default)
+            return obj if obj is not None else default
 
-    with s3:
-        st.markdown(f"""
-        <div class="metric-card">
-            <div class="title">Nodos en Neo4j</div>
-            <div class="value">{seguimiento.get('neo4j_usuarios', 26394):,}</div>
-            <div class="subtitle">Usuarios con relaciones en grafo</div>
-        </div>
-        """, unsafe_allow_html=True)
-
-    with s4:
-        st.markdown(f"""
-        <div class="metric-card">
-            <div class="title">Modularidad de Red</div>
-            <div class="value">{seguimiento.get('neo4j_modularidad', 0.7825):.4f}</div>
-            <div class="subtitle">{seguimiento.get('neo4j_comunidades', 13)} comunidades (Louvain)</div>
-        </div>
-        """, unsafe_allow_html=True)
-
-    # 5. Comparativa entre Corridas Incrementales de Airflow
-    with st.expander("Comparativa de Carga Incremental entre Corridas de Airflow (kpi_runs)"):
-        runs_data = get_kpi_runs_history()
-        summary_rows = []
-        for r in runs_data:
+        table_rows = []
+        for r in history_runs:
             k = r.get("kpis", {})
             seg = r.get("seguimiento", {})
-            summary_rows.append({
-                "Corrida": r.get("run_id", "Sin ID"),
-                "Lotes Cassandra": seg.get("cassandra_lotes", 0),
-                "Docs MongoDB": f"{seg.get('mongo_documentos', 0):,}",
-                "KPI 1 (Escuchas 26/10)": f"{k.get('escuchas_por_dia', 0):,}",
-                "KPI 2 (Crecimiento %)": f"+{k.get('crecimiento_diario_pct', 0):.2f}%",
-                "KPI 3 (Escuchas / Usuario)": f"{k.get('escuchas_por_usuario_activo', 0):.2f}",
-                "KPI 4 (Líder Mes)": f"{k.get('artista_lider', 'BTS')} ({k.get('participacion_artista_lider', 0):.2f}%)",
-                "KPI 5 (Más Conectado)": f"{k.get('artista_mas_conectado', 'Linkin Park')} ({k.get('entidad_mas_conectada', 0):,})"
+            lotes_val = seg.get("cassandra_lotes", seg.get("lotes_procesados", 1))
+
+            e_dia = _get_val(k.get("escuchas_por_dia"), 0)
+            c_dia = _get_val(k.get("crecimiento_diario_pct"), 0)
+            epu = _get_val(k.get("escuchas_por_usuario_activo"), 0)
+            part = _get_val(k.get("participacion_artista_lider"), 0)
+            art = k.get("artista_lider") or (k.get("participacion_artista_lider", {}).get("artista") if isinstance(k.get("participacion_artista_lider"), dict) else "BTS")
+
+            table_rows.append({
+                "Ejecución": r.get("run_id"),
+                "Lotes": f"{lotes_val} / 10",
+                "Escuchas Día": f"{int(e_dia):,}",
+                "Crecimiento %": f"{c_dia:+.1f}%",
+                "Esc/Usuario": f"{epu:.1f}",
+                "Artista Líder": f"{art} ({part:.1f}%)",
             })
-        st.table(pd.DataFrame(summary_rows))
-        st.caption("Datos correspondientes a los snapshots registrados por la tarea generar_kpis en cada ejecución del DAG.")
+        st.dataframe(pd.DataFrame(table_rows), use_container_width=True, hide_index=True)

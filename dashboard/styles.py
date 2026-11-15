@@ -31,48 +31,46 @@ CUSTOM_CSS = """
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
 
-    /* Encabezado principal */
-    .main-header {
-        background-color: #ffffff;
-        padding: 20px 28px;
-        border-radius: 8px;
-        border: 1px solid #e2e8f0;
-        margin-bottom: 20px;
-    }
-
-    .main-header h1 {
-        color: #0f172a !important;
-        font-size: 24px;
-        font-weight: 700;
-        margin: 0 0 6px 0;
-    }
-
-    .main-header p {
-        color: #475569 !important;
-        font-size: 14px;
-        margin: 0;
-    }
-
-    /* Caja de diagnóstico de motor */
-    .motor-box {
-        background-color: #ffffff;
-        border: 1px solid #e2e8f0;
-        border-radius: 8px;
-        padding: 12px 16px;
+    /* Barra superior compacta */
+    .dashboard-header {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        padding: 4px 0 14px 0;
         margin-bottom: 8px;
+        border-bottom: 1px solid #e2e8f0;
     }
 
-    .motor-box .label {
-        font-weight: 600;
-        font-size: 13px;
+    .dashboard-header h2 {
+        margin: 0;
+        font-size: 22px;
         color: #0f172a !important;
-        margin-bottom: 4px;
+        font-weight: 700;
     }
 
-    .motor-box .caption {
+    .dashboard-header .header-sub {
+        font-size: 13px;
+        color: #64748b;
+    }
+
+    /* Tarjetas de estado en sidebar */
+    .sidebar-db-status {
+        background: #ffffff;
+        border: 1px solid #e2e8f0;
+        border-radius: 6px;
+        padding: 10px 12px;
+        margin-bottom: 8px;
+        font-size: 12px;
+    }
+
+    .sidebar-db-status .db-name {
+        font-weight: 600;
+        color: #0f172a;
+    }
+
+    .sidebar-db-status .db-detail {
+        color: #64748b;
         font-size: 11px;
-        color: #64748b !important;
-        margin-top: 4px;
     }
 
     /* Tarjetas de métricas (KPI Cards) */
@@ -80,8 +78,8 @@ CUSTOM_CSS = """
         background-color: #ffffff !important;
         border: 1px solid #cbd5e1 !important;
         border-radius: 8px !important;
-        padding: 16px 18px !important;
-        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05) !important;
+        padding: 14px 16px !important;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04) !important;
     }
 
     .metric-card .title {
@@ -90,7 +88,7 @@ CUSTOM_CSS = """
         color: #475569 !important;
         text-transform: uppercase !important;
         letter-spacing: 0.5px !important;
-        margin-bottom: 6px !important;
+        margin-bottom: 4px !important;
     }
 
     .metric-card .value {
@@ -98,88 +96,92 @@ CUSTOM_CSS = """
         font-weight: 800 !important;
         color: #0f172a !important;
         margin-bottom: 4px !important;
+        line-height: 1.2 !important;
     }
 
     .metric-card .subtitle {
-        font-size: 11px !important;
+        font-size: 12px !important;
         color: #64748b !important;
     }
 
-    /* Contenedor de sección */
+    /* Cajas de contenido general */
     .content-box {
-        background-color: #ffffff;
-        border: 1px solid #e2e8f0;
-        border-radius: 8px;
-        padding: 20px;
-        margin-bottom: 16px;
+        background-color: #ffffff !important;
+        border: 1px solid #e2e8f0 !important;
+        border-radius: 8px !important;
+        padding: 16px 20px !important;
+        margin-bottom: 16px !important;
     }
 
     .content-box h3 {
-        font-size: 17px;
-        font-weight: 600;
+        margin-top: 0 !important;
         color: #0f172a !important;
-        margin-top: 0;
-        margin-bottom: 10px;
-    }
-
-    /* Pestañas */
-    .stTabs [data-baseweb="tab-list"] {
-        gap: 8px;
-        border-bottom: 1px solid #cbd5e1;
-        background-color: transparent;
-    }
-
-    .stTabs [data-baseweb="tab"] {
-        padding: 10px 18px;
-        border-radius: 6px 6px 0 0;
-        color: #475569 !important;
-        font-weight: 500;
-        font-size: 13px;
-        background-color: transparent;
-    }
-
-    .stTabs [aria-selected="true"] {
-        color: #1e3a8a !important;
+        font-size: 16px !important;
         font-weight: 700 !important;
-        border-bottom: 2px solid #1e3a8a !important;
-        background-color: #ffffff !important;
+    }
+
+    .content-box p {
+        color: #334155 !important;
+        font-size: 13px !important;
+        line-height: 1.5 !important;
+        margin-bottom: 6px !important;
     }
 
     /* Badges de estado */
     .status-badge-ok {
-        display: inline-block;
+        background-color: #dcfce7;
+        color: #166534;
         padding: 2px 8px;
+        border-radius: 12px;
         font-size: 11px;
         font-weight: 600;
-        color: #065f46 !important;
-        background-color: #d1fae5 !important;
-        border: 1px solid #a7f3d0;
-        border-radius: 4px;
+        display: inline-block;
     }
 
     .status-badge-off {
-        display: inline-block;
+        background-color: #f1f5f9;
+        color: #475569;
         padding: 2px 8px;
+        border-radius: 12px;
         font-size: 11px;
+        font-weight: 500;
+        display: inline-block;
+    }
+
+    /* Pestañas estilizadas */
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 6px;
+        border-bottom: 2px solid #e2e8f0;
+        margin-bottom: 18px;
+    }
+
+    .stTabs [data-baseweb="tab"] {
+        font-size: 13px;
         font-weight: 600;
-        color: #991b1b !important;
-        background-color: #fee2e2 !important;
-        border: 1px solid #fecaca;
-        border-radius: 4px;
+        color: #64748b;
+        padding: 8px 14px;
+        background-color: transparent;
+        border-radius: 6px 6px 0 0;
     }
 
-    /* Tablas limpias */
-    table {
-        color: #0f172a !important;
+    .stTabs [aria-selected="true"] {
+        color: #1e3a8a !important;
+        border-bottom: 2px solid #1e3a8a !important;
+        background-color: #ffffff;
     }
 
-    th {
-        color: #0f172a !important;
-        font-weight: 600 !important;
+    /* Tablas de Streamlit */
+    div[data-testid="stDataFrame"] {
+        background-color: #ffffff;
+        border: 1px solid #e2e8f0;
+        border-radius: 6px;
+        padding: 6px;
     }
 
-    td {
-        color: #1e293b !important;
+    /* Consola de código */
+    .stCodeBlock {
+        border-radius: 6px;
+        border: 1px solid #cbd5e1;
     }
 </style>
 """

@@ -1,19 +1,30 @@
 """
 Estilos visuales y tema para el Dashboard Analítico.
-Diseño académico minimalista, con paleta sobria de tonos claros y sin elementos distractores.
+Diseño académico minimalista, con paleta sobria de tonos claros, compatible con modo oscuro/claro del navegador.
 """
 
 CUSTOM_CSS = """
 <style>
-    /* Tipografía y espaciado general */
-    html, body, [class*="css"] {
-        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-        color: #1e293b;
+    /* Forzar fondo claro y tipografía legible en todo el dashboard */
+    .stApp {
+        background-color: #f8fafc !important;
+        color: #0f172a !important;
     }
 
-    /* Fondo principal */
-    .stApp {
-        background-color: #f8fafc;
+    /* Tipografía y color explícito para todos los textos y encabezados */
+    html, body, [class*="css"], [data-testid="stMarkdownContainer"] p, [data-testid="stMarkdownContainer"] span, label {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif !important;
+        color: #0f172a !important;
+    }
+
+    h1, h2, h3, h4, h5, h6 {
+        color: #0f172a !important;
+        font-weight: 700 !important;
+        letter-spacing: -0.3px;
+    }
+
+    .stCaption, [data-testid="stCaptionContainer"] {
+        color: #475569 !important;
     }
 
     /* Ocultar elementos decorativos por defecto de Streamlit */
@@ -23,54 +34,75 @@ CUSTOM_CSS = """
     /* Encabezado principal */
     .main-header {
         background-color: #ffffff;
-        padding: 24px 32px;
+        padding: 20px 28px;
         border-radius: 8px;
         border: 1px solid #e2e8f0;
-        margin-bottom: 24px;
+        margin-bottom: 20px;
     }
 
     .main-header h1 {
-        color: #0f172a;
-        font-size: 26px;
+        color: #0f172a !important;
+        font-size: 24px;
         font-weight: 700;
         margin: 0 0 6px 0;
-        letter-spacing: -0.5px;
     }
 
     .main-header p {
-        color: #64748b;
+        color: #475569 !important;
         font-size: 14px;
         margin: 0;
     }
 
-    /* Tarjetas de métricas (KPI Cards) */
-    .metric-card {
+    /* Caja de diagnóstico de motor */
+    .motor-box {
         background-color: #ffffff;
         border: 1px solid #e2e8f0;
         border-radius: 8px;
-        padding: 18px 20px;
-        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+        padding: 12px 16px;
+        margin-bottom: 8px;
     }
 
-    .metric-card .title {
-        font-size: 12px;
+    .motor-box .label {
         font-weight: 600;
-        color: #64748b;
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
-        margin-bottom: 6px;
-    }
-
-    .metric-card .value {
-        font-size: 24px;
-        font-weight: 700;
-        color: #0f172a;
+        font-size: 13px;
+        color: #0f172a !important;
         margin-bottom: 4px;
     }
 
+    .motor-box .caption {
+        font-size: 11px;
+        color: #64748b !important;
+        margin-top: 4px;
+    }
+
+    /* Tarjetas de métricas (KPI Cards) */
+    .metric-card {
+        background-color: #ffffff !important;
+        border: 1px solid #cbd5e1 !important;
+        border-radius: 8px !important;
+        padding: 16px 18px !important;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05) !important;
+    }
+
+    .metric-card .title {
+        font-size: 11px !important;
+        font-weight: 700 !important;
+        color: #475569 !important;
+        text-transform: uppercase !important;
+        letter-spacing: 0.5px !important;
+        margin-bottom: 6px !important;
+    }
+
+    .metric-card .value {
+        font-size: 22px !important;
+        font-weight: 800 !important;
+        color: #0f172a !important;
+        margin-bottom: 4px !important;
+    }
+
     .metric-card .subtitle {
-        font-size: 12px;
-        color: #475569;
+        font-size: 11px !important;
+        color: #64748b !important;
     }
 
     /* Contenedor de sección */
@@ -78,43 +110,37 @@ CUSTOM_CSS = """
         background-color: #ffffff;
         border: 1px solid #e2e8f0;
         border-radius: 8px;
-        padding: 24px;
-        margin-bottom: 20px;
+        padding: 20px;
+        margin-bottom: 16px;
     }
 
     .content-box h3 {
-        font-size: 18px;
+        font-size: 17px;
         font-weight: 600;
-        color: #0f172a;
+        color: #0f172a !important;
         margin-top: 0;
-        margin-bottom: 12px;
-    }
-
-    /* Tablas estilizadas */
-    .dataframe {
-        border: 1px solid #e2e8f0 !important;
-        border-radius: 6px !important;
+        margin-bottom: 10px;
     }
 
     /* Pestañas */
     .stTabs [data-baseweb="tab-list"] {
         gap: 8px;
-        border-bottom: 1px solid #e2e8f0;
+        border-bottom: 1px solid #cbd5e1;
         background-color: transparent;
     }
 
     .stTabs [data-baseweb="tab"] {
         padding: 10px 18px;
         border-radius: 6px 6px 0 0;
-        color: #64748b;
+        color: #475569 !important;
         font-weight: 500;
-        font-size: 14px;
+        font-size: 13px;
         background-color: transparent;
     }
 
     .stTabs [aria-selected="true"] {
         color: #1e3a8a !important;
-        font-weight: 600 !important;
+        font-weight: 700 !important;
         border-bottom: 2px solid #1e3a8a !important;
         background-color: #ffffff !important;
     }
@@ -125,8 +151,9 @@ CUSTOM_CSS = """
         padding: 2px 8px;
         font-size: 11px;
         font-weight: 600;
-        color: #065f46;
-        background-color: #d1fae5;
+        color: #065f46 !important;
+        background-color: #d1fae5 !important;
+        border: 1px solid #a7f3d0;
         border-radius: 4px;
     }
 
@@ -135,9 +162,24 @@ CUSTOM_CSS = """
         padding: 2px 8px;
         font-size: 11px;
         font-weight: 600;
-        color: #991b1b;
-        background-color: #fee2e2;
+        color: #991b1b !important;
+        background-color: #fee2e2 !important;
+        border: 1px solid #fecaca;
         border-radius: 4px;
+    }
+
+    /* Tablas limpias */
+    table {
+        color: #0f172a !important;
+    }
+
+    th {
+        color: #0f172a !important;
+        font-weight: 600 !important;
+    }
+
+    td {
+        color: #1e293b !important;
     }
 </style>
 """

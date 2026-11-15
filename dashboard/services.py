@@ -1,9 +1,11 @@
 """
 Servicios de consulta y conectividad para el Dashboard Analítico.
-Conecta a MongoDB, Cassandra y Neo4j con tolerancia a fallos y lectura directa del snapshot de Airflow.
+Conecta a MongoDB, Cassandra y Neo4j con tolerancia a fallos, sondeo inmediato de puertos
+y lectura directa del snapshot de Airflow sin bloqueos.
 """
 
 import json
+import socket
 from datetime import datetime
 from pathlib import Path
 import pandas as pd
@@ -17,20 +19,63 @@ from databases.cassandra.connection import get_session as get_cassandra_session,
 from databases.neo4j.connection import connect as get_neo4j_driver, DATABASE as NEO4J_DB
 
 
-def get_airflow_snapshot():
-    """Lee el snapshot de KPIs generado por Airflow (archivo local o coleccion kpi_runs de MongoDB)."""
-    # 1. Intentar leer desde MongoDB si esta disponible
+def is_port_open(host, port, timeout=0.15):
+    """Comprobación ultraveloz de socket para evitar que Streamlit espere timeouts de conexión."""
     try:
-        with get_mongo_client() as client:
-            db = get_mongo_database(client)
-            latest_run = db["kpi_runs"].find_one(sort=[("generado_en", -1)])
-            if latest_run and "kpis" in latest_run:
-                latest_run["_id"] = str(latest_run["_id"])
-                return latest_run
-    except Exception:
-        pass
+        with socket.create_connection((host, port), timeout=timeout):
+            return True
+    except (socket.timeout, ConnectionRefusedError, OSError):
+        return False
 
-    # 2. Intentar leer desde el archivo JSON generado por la tarea generar_kpis
+
+def check_connections():
+    """Verifica el estado de conectividad en vivo con las tres bases de datos sin bloquear la UI."""
+    status = {"mongodb": False, "cassandra": False, "neo4j": False}
+
+    if is_port_open("127.0.0.1", 27017):
+        try:
+            with get_mongo_client() as client:
+                client.admin.command("ping")
+                status["mongodb"] = True
+        except Exception:
+            status["mongodb"] = False
+
+    if is_port_open("127.0.0.1", 9042):
+        try:
+            session = get_cassandra_session()
+            session.execute(f"USE {KEYSPACE}")
+            session.cluster.shutdown()
+            status["cassandra"] = True
+        except Exception:
+            status["cassandra"] = False
+
+    if is_port_open("127.0.0.1", 7687):
+        try:
+            with get_neo4j_driver() as driver:
+                with driver.session(database=NEO4J_DB) as session:
+                    session.run("RETURN 1").single()
+                    status["neo4j"] = True
+        except Exception:
+            status["neo4j"] = False
+
+    return status
+
+
+def get_airflow_snapshot():
+    """Lee el snapshot de KPIs generado por Airflow (archivo local o MongoDB) sin retardos."""
+    # 1. Intentar leer desde MongoDB solo si el puerto 27017 está abierto
+    if is_port_open("127.0.0.1", 27017):
+        try:
+            with get_mongo_client() as client:
+                db = get_mongo_database(client)
+                latest_run = db["kpi_runs"].find_one(sort=[("generado_en", -1)])
+                if latest_run and "kpis" in latest_run:
+                    latest_run["_id"] = str(latest_run["_id"])
+                    return latest_run
+        except Exception:
+            pass
+
+    # 2. Leer desde el archivo JSON generado por la tarea generar_kpis
     if AIRFLOW_SNAPSHOT_FILE.is_file():
         try:
             return json.loads(AIRFLOW_SNAPSHOT_FILE.read_text(encoding="utf-8"))
@@ -126,15 +171,16 @@ def get_airflow_snapshot():
 def get_kpi_runs_history():
     """Retorna las corridas históricas registradas en MongoDB kpi_runs o comparativa de corridas."""
     runs = []
-    try:
-        with get_mongo_client() as client:
-            db = get_mongo_database(client)
-            cursor = db["kpi_runs"].find().sort([("generado_en", 1)])
-            for doc in cursor:
-                doc["_id"] = str(doc["_id"])
-                runs.append(doc)
-    except Exception:
-        pass
+    if is_port_open("127.0.0.1", 27017):
+        try:
+            with get_mongo_client() as client:
+                db = get_mongo_database(client)
+                cursor = db["kpi_runs"].find().sort([("generado_en", 1)])
+                for doc in cursor:
+                    doc["_id"] = str(doc["_id"])
+                    runs.append(doc)
+        except Exception:
+            pass
 
     if not runs:
         runs = [
@@ -186,15 +232,16 @@ def get_kpi_runs_history():
 
 def get_top_artists_month(month="2026-10", limit=10):
     """Obtiene el top de artistas del mes desde Cassandra o tabla calibrada."""
-    try:
-        from databases.cassandra.queries import get_top_artists
-        session = get_cassandra_session()
-        data = get_top_artists(session, month, limit)
-        session.cluster.shutdown()
-        if data:
-            return pd.DataFrame(data)
-    except Exception:
-        pass
+    if is_port_open("127.0.0.1", 9042):
+        try:
+            from databases.cassandra.queries import get_top_artists
+            session = get_cassandra_session()
+            data = get_top_artists(session, month, limit)
+            session.cluster.shutdown()
+            if data:
+                return pd.DataFrame(data)
+        except Exception:
+            pass
 
     # Top de artistas oficial de octubre de 2026 (ListenBrainz Dump 2746)
     top_artists = [
@@ -212,82 +259,28 @@ def get_top_artists_month(month="2026-10", limit=10):
     return pd.DataFrame(top_artists)
 
 
-def _is_port_open(host, port, timeout=0.25):
-    import socket
-    try:
-        with socket.create_connection((host, port), timeout=timeout):
-            return True
-    except (socket.timeout, ConnectionRefusedError, OSError):
-        return False
-
-
-def check_connections():
-    """Verifica el estado de conectividad en vivo con las tres bases de datos sin bloqueos."""
-    status = {"mongodb": False, "cassandra": False, "neo4j": False}
-
-    if _is_port_open("127.0.0.1", 27017):
-        try:
-            with get_mongo_client() as client:
-                client.admin.command("ping")
-                status["mongodb"] = True
-        except Exception:
-            status["mongodb"] = False
-
-    if _is_port_open("127.0.0.1", 9042):
-        try:
-            session = get_cassandra_session()
-            session.execute(f"USE {KEYSPACE}")
-            session.cluster.shutdown()
-            status["cassandra"] = True
-        except Exception:
-            status["cassandra"] = False
-
-    if _is_port_open("127.0.0.1", 7687):
-        try:
-            with get_neo4j_driver() as driver:
-                with driver.session(database=NEO4J_DB) as session:
-                    session.run("RETURN 1").single()
-                    status["neo4j"] = True
-        except Exception:
-            status["neo4j"] = False
-
-    return status
-
-
-def get_global_kpis():
-    """Retorna las 5 métricas principales consolidadas del sistema."""
-    # Valores observados y validados en el lote oficial ListenBrainz 2746
-    return {
-        "total_listens": 4855809,
-        "unique_users": 26394,
-        "unique_artists": 286291,
-        "communities_detected": 13,
-        "metadata_completeness_pct": 99.82,
-        "weighted_modularity": 0.7825,
-    }
-
-
 def get_mongodb_listens(query_text="", limit=20):
     """Consulta documentos en MongoDB o provee registros representativos del dataset."""
     results = []
-    try:
-        with get_mongo_client() as client:
-            coll = get_mongo_collection(client)
-            filter_query = {}
-            if query_text:
-                filter_query = {
-                    "$or": [
-                        {"user_name": {"$regex": query_text, "$options": "i"}},
-                        {"track_metadata.artist_name": {"$regex": query_text, "$options": "i"}},
-                        {"track_metadata.track_name": {"$regex": query_text, "$options": "i"}},
-                    ]
-                }
-            cursor = coll.find(filter_query).sort([("timestamp", -1)]).limit(limit)
-            for doc in cursor:
-                doc["_id"] = str(doc.get("_id"))
-                results.append(doc)
-    except Exception:
-        pass
+    if is_port_open("127.0.0.1", 27017):
+        try:
+            with get_mongo_client() as client:
+                coll = get_mongo_collection(client)
+                filter_query = {}
+                if query_text:
+                    filter_query = {
+                        "$or": [
+                            {"user_name": {"$regex": query_text, "$options": "i"}},
+                            {"track_metadata.artist_name": {"$regex": query_text, "$options": "i"}},
+                            {"track_metadata.track_name": {"$regex": query_text, "$options": "i"}},
+                        ]
+                    }
+                cursor = coll.find(filter_query).sort([("timestamp", -1)]).limit(limit)
+                for doc in cursor:
+                    doc["_id"] = str(doc.get("_id"))
+                    results.append(doc)
+        except Exception:
+            pass
 
     if not results:
         # Registros representativos del dump oficial de ListenBrainz
@@ -313,7 +306,6 @@ def get_mongodb_listens(query_text="", limit=20):
 
 def get_cassandra_timeseries():
     """Consulta métricas de series temporales desde Cassandra o dataset consolidado."""
-    # Serie temporal observada por mes
     months_data = {
         "month": ["2026-01", "2026-02", "2026-03", "2026-04", "2026-05", "2026-06", "2026-07", "2026-08", "2026-09", "2026-10"],
         "listens_count": [412300, 435800, 489200, 471000, 502400, 518900, 542100, 531200, 568400, 384509],
@@ -321,7 +313,6 @@ def get_cassandra_timeseries():
     }
     df_months = pd.DataFrame(months_data)
 
-    # Distribución horaria agregada (UTC)
     hours = list(range(24))
     hourly_distribution = [
         112000, 89000, 68000, 52000, 44000, 48000, 72000, 115000, 

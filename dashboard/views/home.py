@@ -24,26 +24,38 @@ def render_home_view():
     mes_ref = snapshot.get("mes_referencia", "2026-10")
     conn_status = check_connections()
 
-    # 1. Barra de diagnóstico de conectividad
+    # 1. Barra de diagnóstico de conectividad (cajas estilizadas y legibles)
     st.markdown("### Estado de Motores de Almacenamiento")
     col_c1, col_c2, col_c3 = st.columns(3)
 
     with col_c1:
-        status_html = "<span class='status-badge-ok'>En Línea</span>" if conn_status["mongodb"] else "<span class='status-badge-off'>Sin Conexión (Modo Resiliente)</span>"
-        st.markdown(f"**MongoDB (Documental):** {status_html}", unsafe_allow_html=True)
-        st.caption("Puerto 27017 | Base: music-dna | Colección: listens / kpi_runs")
+        badge = "<span class='status-badge-ok'>En Línea</span>" if conn_status["mongodb"] else "<span class='status-badge-off'>Sin Conexión (Modo Resiliente)</span>"
+        st.markdown(f"""
+        <div class="motor-box">
+            <div class="label">MongoDB (Documental) &nbsp;{badge}</div>
+            <div class="caption">Puerto 27017 | Base: music-dna | Colección: listens / kpi_runs</div>
+        </div>
+        """, unsafe_allow_html=True)
 
     with col_c2:
-        status_html = "<span class='status-badge-ok'>En Línea</span>" if conn_status["cassandra"] else "<span class='status-badge-off'>Sin Conexión (Modo Resiliente)</span>"
-        st.markdown(f"**Apache Cassandra (Temporal):** {status_html}", unsafe_allow_html=True)
-        st.caption("Puerto 9042 | Keyspace: music_dna | daily_stats / listens_by_user")
+        badge = "<span class='status-badge-ok'>En Línea</span>" if conn_status["cassandra"] else "<span class='status-badge-off'>Sin Conexión (Modo Resiliente)</span>"
+        st.markdown(f"""
+        <div class="motor-box">
+            <div class="label">Apache Cassandra (Temporal) &nbsp;{badge}</div>
+            <div class="caption">Puerto 9042 | Keyspace: music_dna | daily_stats / listens_by_user</div>
+        </div>
+        """, unsafe_allow_html=True)
 
     with col_c3:
-        status_html = "<span class='status-badge-ok'>En Línea</span>" if conn_status["neo4j"] else "<span class='status-badge-off'>Sin Conexión (Modo Resiliente)</span>"
-        st.markdown(f"**Neo4j (Grafo de Red):** {status_html}", unsafe_allow_html=True)
-        st.caption("Puertos 7474 / 7687 | Base: neo4j | Comunidades y Afinidades")
+        badge = "<span class='status-badge-ok'>En Línea</span>" if conn_status["neo4j"] else "<span class='status-badge-off'>Sin Conexión (Modo Resiliente)</span>"
+        st.markdown(f"""
+        <div class="motor-box">
+            <div class="label">Neo4j (Grafo de Red) &nbsp;{badge}</div>
+            <div class="caption">Puertos 7474 / 7687 | Base: neo4j | Comunidades y Afinidades</div>
+        </div>
+        """, unsafe_allow_html=True)
 
-    st.markdown("<hr style='margin: 15px 0; border: none; border-top: 1px solid #e2e8f0;'/>", unsafe_allow_html=True)
+    st.markdown("<hr style='margin: 15px 0; border: none; border-top: 1px solid #cbd5e1;'/>", unsafe_allow_html=True)
 
     # 2. Tarjetas de los 5 KPIs Oficiales
     st.markdown(f"### Indicadores Clave del Pipeline (Día de Referencia: {dia_ref})")
@@ -142,6 +154,9 @@ def render_home_view():
 
             fig_serie.update_layout(
                 template="simple_white",
+                plot_bgcolor="#ffffff",
+                paper_bgcolor="#ffffff",
+                font=dict(color="#0f172a"),
                 margin=dict(l=20, r=20, t=10, b=20),
                 height=310,
                 hovermode="x unified"
@@ -162,6 +177,9 @@ def render_home_view():
             color_discrete_sequence=["#1e3a8a"]
         )
         fig_top.update_layout(
+            plot_bgcolor="#ffffff",
+            paper_bgcolor="#ffffff",
+            font=dict(color="#0f172a"),
             margin=dict(l=20, r=20, t=10, b=20),
             yaxis=dict(autorange="reversed"),
             height=310
@@ -230,4 +248,3 @@ def render_home_view():
             })
         st.table(pd.DataFrame(summary_rows))
         st.caption("Datos correspondientes a los snapshots registrados por la tarea generar_kpis en cada ejecución del DAG.")
-

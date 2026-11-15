@@ -92,7 +92,7 @@ bash scripts/download_dataset.sh --extract
 python3 scripts/validate_dataset.py
 ```
 
-El primer script comprueba la huella SHA-256 oficial y deja el JSONL en `data/processed/`. El segundo valida **en streaming**, muestra fechas extremas y cuenta registros inválidos.
+El primer script comprueba la huella SHA-256 oficial y deja el JSONL en `data/processed/`. MetaBrainz solo mantiene publicados los incrementales de las últimas semanas y el 2746 ya no está en su servidor. Si el comprimido `listenbrainz-20261027.tar.zst` y su `listenbrainz-20261027.sha256` ya están en `data/raw/` (por ejemplo, copiados de otro integrante), el script usa ese checksum local cuando no puede descargar el oficial, verifica el comprimido y extrae. El segundo valida **en streaming**, muestra fechas extremas y cuenta registros inválidos.
 
 Para inspeccionar una pequeña porción sin cargar todo:
 

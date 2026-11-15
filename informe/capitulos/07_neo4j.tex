@@ -68,6 +68,16 @@ Relación & Entre & Propiedades \\
 
 Una relación \code{ESCUCHO} no representa una reproducción sino todas las de un usuario a una canción: guarda la cantidad y la primera y última fecha. Lo mismo hace \code{ESCUCHA_ARTISTA} por artista, y además guarda la proporción que ese artista representa en el historial del usuario. Agregar así reduce las 4,86 millones de escuchas a 1\,791\,408 relaciones \code{ESCUCHO} y 743\,531 \code{ESCUCHA_ARTISTA}, y deja en la relación lo que necesitan las consultas. Las canciones se identifican por \code{recording_msid}, sin fusionar títulos iguales, y cada relación lleva el lote del que proviene. Las claves únicas se garantizan con restricciones (\texttt{CREATE CONSTRAINT ... REQUIRE n.id IS UNIQUE}).
 
+La figura~\ref{fig:neo4j-browser} muestra una parte del grafo cargado, vista en Neo4j Browser: Linkin Park, el artista con más oyentes del lote (sección~\ref{cap:kpis}), y los 21 artistas con los que tiene una relación \code{AFIN_A}. No se muestran nodos \code{Usuario}.
+
+\begin{figure}[H]
+\caption{Afinidades de Linkin Park en Neo4j Browser}
+\label{fig:neo4j-browser}
+\centering
+\includegraphics[width=\textwidth]{figuras/neo4j_browser.png}
+\nota{Consulta \texttt{MATCH p = (:Artista \{nombre: 'Linkin Park'\})-[:AFIN\_A]-(:Artista) RETURN p}. Neo4j Browser dibuja además las afinidades entre los vecinos: 69 relaciones entre los 22 artistas.}
+\end{figure}
+
 \subsection{Carga}
 
 La carga tiene dos etapas. \code{prepare} recorre el JSONL completo y agrega las escuchas en un SQLite intermedio (\code{data/neo4j/prepared.sqlite}): usuarios, canciones, artistas, créditos canción--artista, pares usuario--canción y pares usuario--artista con su cantidad y fechas. Al mismo tiempo valida cada fila (\code{user_id} y \code{timestamp} enteros, \code{recording_msid}, título y artista no vacíos), calcula el SHA-256 del archivo y falla si hay filas inválidas, si el archivo cambió durante la lectura o si no tiene exactamente 4\,855\,809 filas.
@@ -115,6 +125,15 @@ MERGE (u)-[r:ESCUCHO {lote:$group}]->(c)
 SET r.cantidad=1
 RETURN type(r) AS relacion, r.cantidad AS cantidad
 \end{lstlisting}
+
+La figura~\ref{fig:neo4j-crud} muestra la demostración sin pausas sobre el grafo completo: al terminar se eliminaron la relación y los dos nodos de prueba, y el lote no cambia.
+
+\begin{figure}[H]
+\caption{Demostración del CRUD en Neo4j}
+\label{fig:neo4j-crud}
+\centering
+\includegraphics[width=0.7\textwidth]{figuras/neo4j_crud.png}
+\end{figure}
 
 \subsection{Afinidades y comunidades}
 

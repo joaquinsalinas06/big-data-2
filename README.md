@@ -170,11 +170,53 @@ big-data-2/
 │   └── dags/
 │       └── music_dna_dag.py
 │
-├── dashboard/                      # 📁 Dashboard Analítico (Streamlit)
-│   └── app.py
+├── dashboard/                      # 📁 Dashboard Analítico Multimodelo (Streamlit)
+│   ├── app.py                      # Punto de entrada de la aplicación
+│   ├── styles.py                   # Tema sobrio y estilos CSS claros
+│   ├── services.py                 # Conectividad multimodelo resiliente y snapshot
+│   ├── views/                      # Módulos por pestaña
+│   │   ├── home.py                 # Resumen general, 5 KPIs y series de ingesta
+│   │   ├── mongodb_view.py         # Explorador BSON y demo CRUD
+│   │   ├── cassandra_view.py       # Series temporales, consola CQL y demo CRUD
+│   │   ├── neo4j_view.py           # Louvain, recomendador, consola Cypher y demo CRUD
+│   │   └── kpis_view.py            # Fichas técnicas KaTeX y tabla de lotes
+│   └── tests/                      # Pruebas unitarias del dashboard
+│
+├── informe/                        # 📁 Informe Técnico en LaTeX (45 páginas)
+│   ├── main.tex                    # Documento principal
+│   ├── main.pdf                    # PDF compilado final
+│   ├── capitulos/                  # 11 capítulos del informe
+│   └── figuras/                    # Capturas y diagramas de evidencia
 │
 ├── docs/                           # Documentación técnica y consignas oficiales
 └── scripts/                        # Descarga y verificación del dataset oficial
+```
+
+---
+
+## 📊 Dashboard Analítico (Streamlit)
+
+Para iniciar el dashboard multimodelo:
+
+```bash
+streamlit run dashboard/app.py
+```
+
+El dashboard se abrirá automáticamente en `http://localhost:8501`, incorporando:
+* **Resumen General:** Visualización de los 5 KPIs del día de corte (`2026-10-26`), serie temporal diaria de ingesta y top de artistas del mes.
+* **MongoDB:** Buscador por texto con visualización de consulta PyMongo equivalente, visor de documentos JSON crudos y subpanel de demostración CRUD (`insert_one`, `find_one`, `update_one`, `delete_one`).
+* **Cassandra:** Tendencia mensual 2026, distribución horaria UTC y consola interactiva de consultas CQL en vivo con medición de latencia.
+* **Neo4j:** Comunidades musicales de Louvain, artistas puente, sistema de recomendaciones explicables (Jaccard) y consola interactiva Cypher.
+* **Fichas de KPIs:** Formulación matemática formal en LaTeX, fuentes de datos y comparativa de progresión del pipeline por lotes.
+
+---
+
+## 🧪 Pruebas Unitarias
+
+Para ejecutar la suite completa de pruebas unitarias (MongoDB, Neo4j y Dashboard):
+
+```bash
+pytest
 ```
 
 ---
@@ -183,6 +225,7 @@ big-data-2/
 
 | Documento | Descripción |
 | :--- | :--- |
+| [Informe Técnico PDF](informe/main.pdf) | Informe técnico final de 45 páginas compilado en LaTeX |
 | [Dataset y Esquema](docs/dataset.md) | Origen, campos JSON y validación del dump oficial |
 | [MongoDB](docs/mongodb.md) | Modelo documental, índices y guía CRUD |
 | [Apache Cassandra](docs/cassandra.md) | Modelo de series temporales, particionamiento y consultas CQL |
@@ -193,8 +236,11 @@ big-data-2/
 
 ---
 
-## 🔜 Próximas Etapas
+## ✅ Estado de Entregables del Proyecto
 
-- [x] **Automatización (Apache Airflow):** DAG de 6 tareas (Extracción, Validación, Carga MongoDB, Carga Cassandra, Carga Neo4j, Cálculo de KPIs). Ver [docs/airflow.md](docs/airflow.md).
-- **Dashboard Analítico (Streamlit):** Visualización interactiva conectando los 3 almacenes y los 5 KPIs.
-- **Informe Técnico & Video Demostrativo:** Documentación en PDF y grabación de 20-25 minutos.
+- [x] **Capa de Persistencia Multimodelo:** MongoDB, Apache Cassandra y Neo4j con esquemas e índices optimizados.
+- [x] **Operaciones CRUD:** Implementadas y probadas en los tres motores (`databases/*/crud.py`) y en el dashboard.
+- [x] **Automatización (Apache Airflow):** DAG de 6 tareas con carga incremental y cálculo de KPIs.
+- [x] **Dashboard Analítico (Streamlit):** Visualización interactiva conectando las 3 bases, consolas CQL/Cypher y 5 KPIs oficiales.
+- [x] **Informe Técnico en LaTeX:** Documento formal de 45 páginas cumpliendo los 11 capítulos requeridos.
+- [ ] **Video Demostrativo:** Grabación grupal de 20-25 minutos según guion técnico.

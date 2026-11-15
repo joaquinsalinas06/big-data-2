@@ -38,7 +38,16 @@ OUTPUT="$PROCESSED/listens_full.jsonl"
 MEMBER="$NAME/listens/2026/10.listens"
 
 echo "Descargando SHA-256 oficial..."
-curl -fL --retry 3 -o "$CHECKSUM" "$URL.sha256"
+if curl -fL --retry 3 -o "$CHECKSUM.part" "$URL.sha256"; then
+  mv "$CHECKSUM.part" "$CHECKSUM"
+elif [[ -s "$CHECKSUM" ]]; then
+  rm -f "$CHECKSUM.part"
+  echo "El SHA-256 ya no está publicado; se usa la copia local $CHECKSUM."
+else
+  rm -f "$CHECKSUM.part"
+  echo "No se pudo descargar el SHA-256 y no hay copia local en $CHECKSUM." >&2
+  exit 1
+fi
 EXPECTED="$(awk 'NR==1 {print $1}' "$CHECKSUM")"
 if [[ ! "$EXPECTED" =~ ^[[:xdigit:]]{64}$ ]]; then
   echo "Archivo de checksum inválido." >&2

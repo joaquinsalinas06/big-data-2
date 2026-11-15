@@ -21,8 +21,16 @@ if (-not (Get-Command curl.exe -ErrorAction SilentlyContinue)) {
 }
 
 Write-Host "Descargando SHA-256 oficial..."
-& curl.exe -fL --retry 3 -o $checksum "$url.sha256"
-if ($LASTEXITCODE -ne 0) { throw "Falló la descarga del checksum." }
+& curl.exe -fL --retry 3 -o "$checksum.part" "$url.sha256"
+if ($LASTEXITCODE -eq 0) {
+    Move-Item -LiteralPath "$checksum.part" -Destination $checksum -Force
+} elseif ((Test-Path -LiteralPath $checksum) -and (Get-Item -LiteralPath $checksum).Length -gt 0) {
+    Remove-Item -LiteralPath "$checksum.part" -ErrorAction SilentlyContinue
+    Write-Host "El SHA-256 ya no está publicado; se usa la copia local $checksum."
+} else {
+    Remove-Item -LiteralPath "$checksum.part" -ErrorAction SilentlyContinue
+    throw "No se pudo descargar el SHA-256 y no hay copia local en $checksum."
+}
 
 $expected = ((Get-Content -LiteralPath $checksum -Raw).Trim() -split '\s+')[0].ToLowerInvariant()
 if ($expected -notmatch '^[0-9a-f]{64}$') { throw "Archivo SHA-256 inválido." }

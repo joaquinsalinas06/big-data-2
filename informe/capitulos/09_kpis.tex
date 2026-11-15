@@ -5,7 +5,7 @@ Definimos cinco indicadores. Los cuatro primeros salen de las tablas agregadas d
 
 \subsection{Día de referencia}
 
-Los indicadores diarios se calculan sobre un día de referencia $d^{*}$, que es el penúltimo día de la tabla \code{daily_stats}. El último día se descarta porque el volcado se cortó el 27 de octubre de 2026 a las 00:01 y ese día tiene solo 4 escuchas: usarlo daría un crecimiento de $-100$~\% que no dice nada sobre los usuarios. El mes de referencia $m^{*}$ es el mes de $d^{*}$.
+Los indicadores diarios se calculan sobre un día de referencia $d^{*}$, que es el último día de la tabla \code{daily_stats} anterior al día del corte del volcado. El día del corte se toma de la fecha máxima que registra la validación (el 27 de octubre de 2026) y se descarta porque el volcado se cortó a las 00:01 y ese día tiene solo 4 escuchas: usarlo daría un crecimiento de $-100$~\% que no dice nada sobre los usuarios. La regla filtra por fecha y no por posición porque, mientras Cassandra tiene pocos lotes cargados, el 27 de octubre todavía no aparece en la tabla y el último día disponible es el 26, que sí es un día completo. El mes de referencia $m^{*}$ es el mes de $d^{*}$.
 
 En las fórmulas, $E(d)$ es la cantidad de escuchas con fecha $d$ (en UTC) y $U(d)$ la cantidad de usuarios distintos con al menos una escucha ese día. Ambos valores están precalculados en \code{daily_stats}.
 
@@ -65,9 +65,33 @@ El valor se lee de \code{share_pct} en la fila con \code{rank = 1} de \code{top_
 \[
 C(a) = \left|\{\, u : (u)\text{-[:ESCUCHA\_ARTISTA]}\rightarrow(a) \,\}\right|, \qquad \text{KPI}_5 = \max_{a} C(a)
 \]
-El indicador reporta el artista que alcanza el máximo y su valor $C(a)$. Se obtiene con la consulta de artistas con más oyentes del módulo de Neo4j.
+El indicador reporta el artista que alcanza el máximo y su valor $C(a)$. Se obtiene con la consulta de artistas con más oyentes del módulo de Neo4j. En el grafo del incremental 2746 el máximo es Linkin Park, con 1\,137 oyentes.
 
 \textit{Interpretación.} Es el grado de entrada del artista en el grafo usuario--artista: cuántos usuarios distintos lo escuchan, sin importar cuántas veces. Mide alcance y no volumen, y por eso complementa al KPI 4: un artista puede tener muchas escuchas concentradas en pocos fans y otro, menos escuchas repartidas entre mucha gente.
+
+\subsection{Valores obtenidos}
+
+La tabla~\ref{tab:kpis-valores} muestra los valores que calculó \code{generar_kpis} en las dos corridas de la sección~\ref{sec:airflow-corridas}, junto con los del archivo completo. En ambas corridas el día de referencia fue el 26 de octubre de 2026 y el mes de referencia, octubre. Cassandra tenía 1 y 2 de los 10 lotes del archivo, así que los cuatro primeros indicadores describen solo las escuchas cargadas hasta ese momento.
+
+\begin{table}[H]
+\centering
+\caption{Valores de los KPIs según los lotes cargados}
+\label{tab:kpis-valores}
+\begin{tabularx}{\textwidth}{l Y Y Y}
+\toprule
+KPI & Corrida 1 (1 lote) & Corrida 2 (2 lotes) & Archivo completo (10 lotes) \\
+\midrule
+1. Escuchas del 26 de octubre & 66\,562 & 223\,289 & 1\,359\,824 \\
+2. Crecimiento respecto al 25 & +158,31~\% & +666,82~\% & +3\,364~\% \\
+3. Escuchas por usuario activo & 12,45 (5\,345 usuarios) & 24,99 (8\,936 usuarios) & 52,3 (26\,020 usuarios) \\
+4. Participación del artista líder & BTS, 13,10~\% & BTS, 17,37~\% & BTS, 12,65~\% \\
+5. Artista con más oyentes & Linkin Park, 1\,137 & Linkin Park, 1\,137 & Linkin Park, 1\,137 \\
+\bottomrule
+\end{tabularx}
+\nota{Las dos primeras columnas salen de los snapshots de \code{kpi_runs}. La última repite los valores de la carga completa de Cassandra citados en las secciones de cada KPI; el KPI 5 no depende de Cassandra porque el grafo tiene el lote completo desde la primera corrida.}
+\end{table}
+
+Los cuatro primeros valores crecen de una corrida a otra porque cada lote agrega más escuchas del 26 de octubre, no porque haya cambiado la escucha de los usuarios. La participación de BTS es mayor con pocos lotes (17,37~\% con 2 lotes) que con el archivo completo (12,65~\%): en las primeras líneas del archivo sus escuchas están más concentradas. El KPI 5 no cambia: Linkin Park tiene 1\,137 oyentes distintos en el grafo. Comparado con el KPI 4, muestra la diferencia entre volumen y alcance: BTS es el artista con más escuchas de octubre, pero Linkin Park es el que escucha más gente distinta.
 
 \subsection{Métricas de seguimiento}
 
@@ -94,3 +118,13 @@ Campo & Contenido \\
 \end{tabularx}
 \nota{En \code{kpi_runs} el \code{_id} de cada documento es el \code{run_id}, de modo que un reintento de la tarea reemplaza el snapshot en lugar de duplicarlo.}
 \end{table}
+
+La figura~\ref{fig:kpi-runs} muestra los dos documentos de \code{kpi_runs}, uno por corrida, con los valores de los indicadores y las métricas de seguimiento que permiten ver cómo creció la carga.
+
+\begin{figure}[H]
+\caption{Snapshots de KPIs guardados en \code{kpi_runs}}
+\label{fig:kpi-runs}
+\centering
+\includegraphics[width=0.85\textwidth]{figuras/kpis_latest.png}
+\nota{La consulta proyecta solo los valores, los artistas y dos métricas de seguimiento; cada documento guarda además el nombre, la unidad y la fuente de cada KPI y la serie diaria.}
+\end{figure}

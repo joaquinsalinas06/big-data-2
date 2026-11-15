@@ -27,7 +27,7 @@ Ruta en el proyecto & \code{data/processed/listens_full.jsonl} \\
 
 Un incremental no es todo ListenBrainz: contiene los eventos enviados a la plataforma desde el incremental anterior. Para reconstruir una réplica completa haría falta un volcado completo y aplicar sobre él todos los incrementales, incluidas las eliminaciones. En este proyecto estudiamos expresamente ese lote de ingesta.
 
-La descarga la hacen \code{scripts/download_dataset.sh} (Linux y macOS) y \code{scripts/download_dataset.ps1} (Windows). Ambos bajan primero el archivo \code{.sha256} oficial, descargan el comprimido, comprueban que la huella SHA-256 coincida y recién entonces extraen el archivo de escuchas. La extracción escribe a un archivo temporal \code{.part} y lo renombra al terminar, así nunca queda un archivo incompleto con el nombre final. Si el comprimido ya existe y su huella es correcta, no se vuelve a descargar.
+La descarga la hacen \code{scripts/download_dataset.sh} (Linux y macOS) y \code{scripts/download_dataset.ps1} (Windows). Ambos bajan primero el archivo \code{.sha256} oficial, descargan el comprimido, comprueban que la huella SHA-256 coincida y recién entonces extraen el archivo de escuchas. La extracción escribe a un archivo temporal \code{.part} y lo renombra al terminar, así nunca queda un archivo incompleto con el nombre final. Si el comprimido ya existe y su huella es correcta, no se vuelve a descargar. MetaBrainz solo mantiene publicados los incrementales de las últimas semanas y el 2746 ya no está en su servidor, así que los scripts aceptan el comprimido y el \code{.sha256} guardados en \code{data/raw/}: si el checksum oficial no se puede descargar, verifican el archivo con la copia local.
 
 \subsection{Estructura de cada registro}
 

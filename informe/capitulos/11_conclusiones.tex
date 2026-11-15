@@ -18,7 +18,7 @@ Por último, integrar módulos hechos por separado sacó a la luz errores que no
 \begin{itemize}
   \item Cassandra corre en un solo nodo con factor de replicación 1 y Airflow usa \code{LocalExecutor} en la misma máquina. Sirve para el proyecto, no tolera caídas ni escala a varios nodos.
   \item Los artistas se identifican por su nombre tal como viene en el volcado, así que homónimos y variantes de escritura cuentan como artistas distintos, tanto en Cassandra como en Neo4j.
-  \item El corte del volcado deja el 27 de octubre casi vacío y concentra la ingesta en los días anteriores. Los KPIs usan el penúltimo día como referencia, pero la serie temporal sigue mostrando saltos que no representan la escucha real.
+  \item El corte del volcado deja el 27 de octubre casi vacío y concentra la ingesta en los días anteriores. Los KPIs usan como referencia el último día anterior al corte, pero la serie temporal sigue mostrando saltos que no representan la escucha real.
   \item Neo4j no se carga de forma incremental: el loader exige el archivo completo y las proporciones de cada usuario se calculan sobre todo el lote. La carga incremental es además simulada, porque siempre se lee el mismo archivo.
   \item Cada corrida de MongoDB recorre la colección para reconstruir las huellas y cada corrida de Cassandra relee los lotes ya cargados para recalcular los agregados, así que ambas tareas tardan más a medida que crecen las bases.
   \item Las comunidades dependen de los umbrales del análisis y solo cubren el 23,76~\% de las escuchas, lo que limita lo que se puede concluir sobre la diversidad de los usuarios.

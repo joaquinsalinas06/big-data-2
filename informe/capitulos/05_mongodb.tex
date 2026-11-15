@@ -89,7 +89,7 @@ La figura~\ref{fig:mongo-crud} muestra la demostración ejecutada sin pausas con
 \caption{Demostración del CRUD en MongoDB}
 \label{fig:mongo-crud}
 \centering
-\includegraphics[width=0.78\textwidth]{figuras/mongo_crud.png}
+\includegraphics[width=\textwidth]{figuras/mongo_crud.png}
 \end{figure}
 
 El módulo incluye además una API REST con FastAPI sobre la misma colección, con documentación interactiva en Swagger. Las rutas bajo \code{/listens} cubren creación (\code{POST}), consulta por identificador y listado paginado (\code{GET}), actualización parcial y total (\code{PATCH} y \code{PUT}) y eliminación (\code{DELETE}), además de un resumen estadístico y un top de artistas. Cada solicitud pasa por la ruta, el modelo Pydantic que valida los campos (y responde 422 si son incorrectos antes de escribir en la base), un servicio que arma los filtros y un repositorio que ejecuta la operación con PyMongo. En la validación final se ejecutaron tres rondas completas de CRUD por HTTP contra la colección real y la cantidad de documentos quedó igual antes y después.

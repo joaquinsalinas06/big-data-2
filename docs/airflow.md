@@ -128,7 +128,7 @@ docker compose exec airflow-scheduler airflow dags list-import-errors
 docker compose exec airflow-scheduler airflow dags test music_dna_pipeline
 ```
 
-Si el dataset no está en `data/processed/`, la primera tarea lo descarga. Para revisar el resultado:
+Si el dataset no está en `data/processed/`, la primera tarea lo descarga. MetaBrainz ya retiró el incremental 2746, así que en la práctica hay que tener el comprimido y su `.sha256` en `data/raw/`: el script usa la copia local del checksum cuando el oficial ya no se puede descargar. Para revisar el resultado:
 
 ```bash
 cat data/airflow/kpis_latest.json
@@ -136,11 +136,76 @@ docker compose exec mongodb mongosh listenbrainz_db --eval "db.listens.countDocu
 docker compose exec cassandra cqlsh -e "SELECT count(*) FROM music_dna.load_batches"
 ```
 
+## Corridas medidas
+
+Probamos el pipeline completo dos veces seguidas, con las tres bases vacías al empezar. La laptop tenía Ubuntu 22.04, 4 núcleos y 8 GB de RAM, menos de los 10 GB que pide el compose, así que agregamos un `docker-compose.override.yml` local (no está versionado) que baja la memoria de las bases:
+
+```yaml
+services:
+  mongodb:
+    command: ["mongod", "--wiredTigerCacheSizeGB", "0.5"]
+  cassandra:
+    environment:
+      MAX_HEAP_SIZE: 1G
+      HEAP_NEWSIZE: 200M
+  neo4j:
+    environment:
+      NEO4J_server_memory_heap_initial__size: 512M
+      NEO4J_server_memory_heap_max__size: 1G
+      NEO4J_server_memory_pagecache_size: 512M
+      NEO4J_db_tx__log_rotation_retention__policy: "1 files"
+  airflow-webserver:
+    environment:
+      AIRFLOW__WEBSERVER__WORKERS: "1"
+```
+
+La última opción de Neo4j hace falta si el disco está justo: después de la primera carga completa los transaction logs ocupaban 2,3 GB del volumen y con `1 files` bajaron a 515 MB.
+
+La primera corrida se lanzó con `airflow dags test`, que ejecuta las tareas una tras otra en un solo proceso. La segunda se lanzó desde la interfaz, activando el DAG: el scheduler creó la corrida programada del 14 de noviembre y la ejecutó con `LocalExecutor`, con las tres cargas en paralelo.
+
+| Tarea | Corrida 1 (s) | Corrida 2 (s) |
+| --- | ---: | ---: |
+| `extraer_datos` | 6,3 | 6,3 |
+| `validar_y_limpiar` | 103,5 | 57,2 |
+| `cargar_mongodb` | 40,9 | 38,9 |
+| `cargar_cassandra` | 107,6 | 96,6 |
+| `cargar_neo4j` | 1 039,4 | 9,6 |
+| `generar_kpis` | 28,8 | 11,5 |
+| Corrida completa | 1 326,8 | 176 |
+
+En la corrida 1 el total es la suma de las tareas; en la 2 es la duración que reporta Airflow (2 min 56 s), porque las cargas van en paralelo. Casi toda la primera corrida es Neo4j: 261,7 s de `prepare` y unos 778 s de carga y reconciliación en el grafo. Ese tiempo varía bastante en esta laptop según la memoria libre; en otra carga completa anterior la misma tarea tardó 569 s. En la segunda corrida Neo4j solo revisa el lote.
+
+| Medida | Después de la corrida 1 | Después de la corrida 2 |
+| --- | ---: | ---: |
+| Documentos en `listens` | 100 000 | 200 000 |
+| Snapshots en `kpi_runs` | 1 | 2 |
+| Lotes en `load_batches` | 1 (500 000 escuchas) | 2 (1 000 000 escuchas) |
+| Usuarios / canciones en Neo4j | 26 394 / 1 420 842 | 26 394 / 1 420 842 |
+| Relaciones `ESCUCHO` / escuchas en Neo4j | 1 791 408 / 4 855 809 | 1 791 408 / 4 855 809 |
+
+En la segunda corrida el log de `cargar_neo4j` dice `El lote listenbrainz-2746 ya está completo en Neo4j; no se vuelve a cargar` y los totales no cambian.
+
+Los KPIs de cada corrida, con el 26 de octubre como día de referencia en las dos:
+
+| KPI | Corrida 1 (1 lote) | Corrida 2 (2 lotes) |
+| --- | ---: | ---: |
+| Escuchas del día | 66 562 | 223 289 |
+| Crecimiento diario | +158,31 % | +666,82 % |
+| Escuchas por usuario activo | 12,45 (5 345 usuarios) | 24,99 (8 936 usuarios) |
+| Participación del artista líder | BTS, 13,10 % | BTS, 17,37 % |
+| Artista con más oyentes | Linkin Park, 1 137 | Linkin Park, 1 137 |
+
+Los cuatro primeros crecen porque cada lote agrega escuchas del 26 de octubre; con el archivo completo son los valores que se citan en la sección de KPIs. El quinto no cambia porque el grafo tiene el lote completo desde la primera corrida.
+
+**Memoria.** En la segunda corrida la memoria disponible bajó como mínimo a 875 MB y las seis tareas terminaron al primer intento. En una prueba anterior, con el navegador abierto y el swap casi lleno, `cargar_cassandra` falló dos veces: la primera, en paralelo con la carga de Mongo, con `WriteTimeout`, y la segunda, ya sola, con `NoHostAvailable` porque la conexión estaba saturada. El tercer intento terminó bien y no quedaron filas duplicadas, porque el lote se registra en `load_batches` recién después de escribir sus escuchas. Por eso dejamos las cargas en paralelo: con memoria libre la corrida termina sin reintentos, y si Cassandra no alcanza a responder, los reintentos repiten el lote sin efectos secundarios. En una máquina de 8 GB conviene cerrar el navegador mientras corre el DAG.
+
+**Pruebas.** `pytest` da 14 pruebas que pasan y 2 que se saltan porque son de integración y hay que activarlas a mano. Con las bases encendidas, `RUN_MONGO_TESTS=1` hace pasar la de Mongo (la colección queda con los mismos documentos). La de Neo4j (`NEO4J_INTEGRATION=1`) todavía importa `database`, el módulo de antes de mover el código a `databases/neo4j/`, y falla al importar.
+
 ## KPIs
 
 Los cinco KPIs se calculan en `generar_kpis`. Los cuatro primeros salen de las tablas agregadas de Cassandra y el quinto del grafo de Neo4j.
 
-Los de Cassandra se calculan sobre un día de referencia `d`: el penúltimo día de `daily_stats`. El último se descarta porque el dump se cortó el 27 de octubre a las 00:01 y ese día tiene solo 4 escuchas; usarlo daría un crecimiento de −100 % que no dice nada. Como el dataset es un lote de ingesta, los valores reflejan qué enviaron los usuarios a ListenBrainz en ese periodo, no la popularidad general (ver [docs/dataset.md](dataset.md)).
+Los de Cassandra se calculan sobre un día de referencia `d`: el último día de `daily_stats` anterior al día del corte del dump. El día del corte sale de la fecha máxima que deja `validar_y_limpiar` en `validacion.json` (el 27 de octubre). Ese día se descarta porque el dump se cortó a las 00:01 y tiene solo 4 escuchas; usarlo daría un crecimiento de −100 % que no dice nada. Se filtra por fecha y no por posición porque mientras Cassandra tiene pocos lotes el 27 de octubre todavía no está en la tabla: las 4 escuchas de ese día no entran en los primeros lotes y la serie termina el 26. La primera versión del DAG descartaba siempre el último día de la tabla, y con uno o dos lotes eso dejaba fuera el 26 y reportaba el 25. Como el dataset es un lote de ingesta, los valores reflejan qué enviaron los usuarios a ListenBrainz en ese periodo, no la popularidad general (ver [docs/dataset.md](dataset.md)).
 
 | KPI | Definición | Fórmula | Fuente |
 | --- | --- | --- | --- |

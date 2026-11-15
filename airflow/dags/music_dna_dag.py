@@ -279,9 +279,13 @@ def music_dna_pipeline():
             days = get_daily_stats(session, years[-1])
             if len(days) < 2 and len(years) > 1:
                 days = get_daily_stats(session, years[-2]) + days
-            # El último día de la serie se descarta: el dump se corta a las 00:01 y ese día
-            # queda casi vacío (el 27 de octubre tiene 4 escuchas).
-            reference = days[-2] if len(days) > 1 else days[-1]
+            # El día del corte del dump se descarta: el dump se corta a las 00:01 y ese día
+            # queda casi vacío (el 27 de octubre tiene 4 escuchas). Se filtra por fecha y no
+            # por posición porque con pocos lotes cargados ese día todavía no aparece.
+            validation = json.loads(VALIDATION_REPORT.read_text(encoding="utf-8"))
+            cut_day = datetime.fromisoformat(validation["fecha_maxima"]).date()
+            complete_days = [row for row in days if row["day"].date() < cut_day]
+            reference = complete_days[-1] if complete_days else days[-1]
             day = reference["day"].date()
             month = f"{day.year:04d}-{day.month:02d}"
             top_artist = get_top_artists(session, month, 1)[0]

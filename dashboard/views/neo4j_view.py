@@ -146,56 +146,25 @@ def render_neo4j_view():
         btn_run_cypher = st.button("Ejecutar Consulta Cypher", key="btn_run_cypher")
         if btn_run_cypher:
             import time
-            t0 = time.perf_counter()
-            c_res = []
-            if is_port_open("127.0.0.1", 7687):
+            if not is_port_open("127.0.0.1", 7687):
+                st.error("No se pudo conectar a Neo4j en localhost:7687.")
+                st.info("Para ejecutar consultas Cypher en vivo, inicie el servicio con: `docker compose up -d neo4j`")
+            else:
                 try:
+                    t0 = time.perf_counter()
                     with get_neo4j_driver() as driver:
                         with driver.session(database=NEO4J_DB) as session:
                             records = session.run(cypher_code)
                             c_res = [dict(r) for r in records]
+                    elapsed = (time.perf_counter() - t0) * 1000
+
+                    if c_res:
+                        st.success(f"Consulta Cypher ejecutada en {elapsed:.1f} ms | {len(c_res)} registros devueltos.")
+                        st.dataframe(pd.DataFrame(c_res), use_container_width=True, hide_index=True)
+                    else:
+                        st.info(f"Consulta Cypher ejecutada en {elapsed:.1f} ms. El grafo no contiene nodos que coincidan con la consulta. (Ejecute el loader de Neo4j para poblar el grafo).")
                 except Exception as e:
-                    st.warning(f"Error en Neo4j local: {e}. Mostrando datos de referencia.")
-
-            if not c_res:
-                if "Top artistas" in cypher_choice:
-                    c_res = [
-                        {"artista": "Linkin Park", "oyentes_unicos": 1137},
-                        {"artista": "BTS", "oyentes_unicos": 842},
-                        {"artista": "Taylor Swift", "oyentes_unicos": 789},
-                        {"artista": "Radiohead", "oyentes_unicos": 654},
-                        {"artista": "Kendrick Lamar", "oyentes_unicos": 580},
-                        {"artista": "Charli xcx", "oyentes_unicos": 521},
-                        {"artista": "The Weeknd", "oyentes_unicos": 498},
-                        {"artista": "Billie Eilish", "oyentes_unicos": 472},
-                        {"artista": "Daft Punk", "oyentes_unicos": 430},
-                        {"artista": "Metallica", "oyentes_unicos": 415},
-                    ][:limit_n]
-                elif "Canciones interpretadas" in cypher_choice:
-                    c_res = [
-                        {"cancion": "Creep", "artista": art},
-                        {"cancion": "Karma Police", "artista": art},
-                        {"cancion": "No Surprises", "artista": art},
-                        {"cancion": "Paranoid Android", "artista": art},
-                        {"cancion": "Fake Plastic Trees", "artista": art},
-                    ]
-                elif "Búsqueda" in cypher_choice:
-                    c_res = [
-                        {"artista": "Radiohead"},
-                        {"artista": "TV On The Radio"},
-                        {"artista": "Radio Futura"},
-                    ]
-                else:
-                    c_res = [{
-                        "usuarios": 26020,
-                        "canciones": 142850,
-                        "relaciones_escucha": 1359824,
-                        "total_escuchas": 1359824
-                    }]
-
-            elapsed = (time.perf_counter() - t0) * 1000
-            st.success(f"Consulta Cypher ejecutada en {elapsed:.1f} ms | {len(c_res)} registros devueltos.")
-            st.dataframe(pd.DataFrame(c_res), use_container_width=True, hide_index=True)
+                    st.error(f"Error al ejecutar consulta Cypher en Neo4j: {e}")
 
     with subtab_crud:
         st.markdown("#### Demostración de Operaciones CRUD en Neo4j")
@@ -243,20 +212,29 @@ def render_neo4j_view():
             ```
             """)
 
-        btn_run_neo_crud = st.button("Ejecutar Flujo CRUD de Demostración", key="btn_neo4j_crud")
+        btn_run_neo_crud = st.button("Ejecutar Flujo CRUD en Neo4j", key="btn_neo4j_crud")
         if btn_run_neo_crud:
-            online = is_port_open("127.0.0.1", 7687)
-            if online:
-                st.success("Conectado a Neo4j local (localhost:7687). Ejecutando transacciones de escritura...")
+            if not is_port_open("127.0.0.1", 7687):
+                st.error("Neo4j no se encuentra en línea en localhost:7687. Inicie el contenedor con: `docker compose up -d neo4j`")
             else:
-                st.info("Neo4j local no iniciado. Ejecutando verificación de esquema de grafo y sintaxis Cypher:")
-
-            n_demo_steps = [
-                ("1. CREATE (Nodos y Relación)", "Creados (:Usuario {id: -1}) y (:Cancion {id: 'demo_track'}), vinculados por [:ESCUCHO {cantidad: 1}]", "Exitoso"),
-                ("2. READ (Consulta de Grafo)", "MATCH verificado: el usuario -1 tiene 1 reproducción de la canción de prueba", "Exitoso"),
-                ("3. UPDATE (Modificación de Propiedad)", "SET r.cantidad = 5 aplicado sobre la relación existente", "Exitoso"),
-                ("4. DELETE (Eliminación Limpia)", "DETACH DELETE ejecutado sobre nodos y aristas de prueba. Subgrafo limpio", "Exitoso"),
-            ]
-            for paso, detalle, estado in n_demo_steps:
-                st.markdown(f"**{paso}** — `{estado}`: {detalle}")
-            st.success("Operaciones CRUD sobre grafo en Neo4j demostradas satisfactoriamente.")
+                try:
+                    from databases.neo4j.graph import crud as neo_crud
+                    with get_neo4j_driver() as driver:
+                        with driver.session(database=NEO4J_DB) as session:
+                            session.execute_write(neo_crud.delete_nodes)
+                            # 1. Create
+                            nodes = session.execute_write(neo_crud.create_nodes)
+                            rel = session.execute_write(neo_crud.create_relationship)
+                            st.markdown(f"**1. CREATE:** Creados `(:Usuario {{id: {nodes['usuario']}}})` y `(:Cancion {{titulo: '{nodes['cancion']}'}})`, vinculados por `[:ESCUCHO]`")
+                            # 2. Read
+                            read_data = session.execute_read(neo_crud.get_listens)
+                            st.markdown(f"**2. READ:** Leídas {len(read_data)} relaciones del subgrafo de prueba.")
+                            # 3. Update
+                            updated = session.execute_write(neo_crud.update_properties, 5)
+                            st.markdown(f"**3. UPDATE:** Propiedad `cantidad` actualizada a {updated.get('cantidad')}")
+                            # 4. Delete
+                            session.execute_write(neo_crud.delete_nodes)
+                            st.markdown("**4. DELETE:** Nodos y relaciones de prueba eliminados del grafo.")
+                            st.success("Flujo CRUD ejecutado exitosamente sobre Neo4j local (localhost:7687).")
+                except Exception as e:
+                    st.error(f"Error al ejecutar operaciones CRUD en Neo4j: {e}")

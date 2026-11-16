@@ -54,7 +54,7 @@ La figura~\ref{fig:dashboard-general} ilustra la pantalla de inicio del dashboar
 \nota{La interfaz presenta las cinco tarjetas de KPIs, la serie diaria con selector de métrica, el ranking mensual de artistas y el estado de los motores en el panel lateral.}
 \end{figure}
 
-El panel central integra el selector de métrica para la serie temporal diaria y el gráfico de barras horizontales con el porcentaje de participación del catálogo mensual. Debajo se sitúa el resumen operativo del pipeline de Airflow (10 lotes procesados, 4\,855\,809 escuchas válidas y 1,83~\% de descarte por limpieza) junto con la tabla comparativa de corridas extraída de \code{kpi_runs}.
+El panel central integra el selector de métrica para la serie temporal diaria y el gráfico de barras horizontales con el porcentaje de participación del catálogo mensual. Debajo se sitúa el resumen operativo del pipeline de Airflow (10 lotes en Cassandra, 4\,000\,000 de documentos en MongoDB, 4\,855\,809 escuchas y modularidad de grafo de 0,7825) junto con la tabla comparativa de corridas extraída de \code{kpi_runs}.
 
 \subsection{Vistas especializadas y consolas interactivas}
 

@@ -6,14 +6,13 @@ Incluye buscador dinámico, visor de documentos BSON/JSON y consola de operacion
 import streamlit as st
 import pandas as pd
 from datetime import datetime, timezone
-from dashboard.services import get_mongodb_listens, is_port_open
+from dashboard.services import get_mongodb_listens, is_port_open, get_mongo_client, get_mongo_collection
 
 
 def render_mongodb_view():
     st.markdown("### Almacenamiento Documental: MongoDB")
     st.caption("Base de datos: 'listenbrainz_db' | Colección: 'listens' | Esquema semiestructurado BSON")
 
-    # Pestañas internas para separar consultas de la demo CRUD
     subtab_query, subtab_crud = st.tabs(["Consultas y Exploración", "Operaciones CRUD (Demostración)"])
 
     with subtab_query:
@@ -45,38 +44,41 @@ def render_mongodb_view():
         with st.expander("Ver consulta PyMongo equivalente", expanded=False):
             st.code(query_code, language="python")
 
-        records = get_mongodb_listens(query_text=search_query, limit=limit)
+        if not is_port_open("127.0.0.1", 27017):
+            st.error("No se pudo conectar a MongoDB en localhost:27017.")
+            st.info("Para explorar documentos en vivo, inicie el contenedor con: `docker compose up -d mongodb`")
+        else:
+            records = get_mongodb_listens(query_text=search_query, limit=limit)
 
-        if not records:
-            st.info("No se encontraron documentos con el criterio indicado.")
-            return
+            if not records:
+                st.info("La colección 'listens' en MongoDB está vacía o ningún registro coincide con el criterio. (Para cargar datos ejecute: `python -m databases.mongodb.loader --limit 1000`).")
+            else:
+                table_data = []
+                for r in records:
+                    ts = r.get("timestamp", 0)
+                    formatted_date = datetime.fromtimestamp(ts, tz=timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+                    metadata = r.get("track_metadata", {})
+                    table_data.append({
+                        "ID Documento": str(r.get("_id"))[:12] + "...",
+                        "Usuario": r.get("user_name"),
+                        "Fecha UTC": formatted_date,
+                        "Artista": metadata.get("artist_name", "Desconocido"),
+                        "Canción": metadata.get("track_name", "Desconocido"),
+                        "Álbum": metadata.get("release_name") or "Sin especificar",
+                    })
 
-        table_data = []
-        for r in records:
-            ts = r.get("timestamp", 0)
-            formatted_date = datetime.fromtimestamp(ts, tz=timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
-            metadata = r.get("track_metadata", {})
-            table_data.append({
-                "ID Documento": str(r.get("_id"))[:12] + "...",
-                "Usuario": r.get("user_name"),
-                "Fecha UTC": formatted_date,
-                "Artista": metadata.get("artist_name", "Desconocido"),
-                "Canción": metadata.get("track_name", "Desconocido"),
-                "Álbum": metadata.get("release_name") or "Sin especificar",
-            })
+                df = pd.DataFrame(table_data)
+                st.dataframe(df, use_container_width=True, hide_index=True)
 
-        df = pd.DataFrame(table_data)
-        st.dataframe(df, use_container_width=True, hide_index=True)
-
-        st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
-        st.markdown("#### Inspección de Documento BSON Crudo")
-        selected_idx = st.selectbox(
-            "Seleccione un registro para visualizar su JSON completo:",
-            range(len(records)),
-            format_func=lambda i: f"{table_data[i]['Artista']} — {table_data[i]['Canción']} ({table_data[i]['Usuario']})",
-            key="mongo_json_select"
-        )
-        st.json(records[selected_idx])
+                st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
+                st.markdown("#### Inspección de Documento BSON Crudo")
+                selected_idx = st.selectbox(
+                    "Seleccione un registro para visualizar su JSON completo:",
+                    range(len(records)),
+                    format_func=lambda i: f"{table_data[i]['Artista']} — {table_data[i]['Canción']} ({table_data[i]['Usuario']})",
+                    key="mongo_json_select"
+                )
+                st.json(records[selected_idx])
 
     with subtab_crud:
         st.markdown("#### Demostración de Operaciones CRUD en MongoDB")
@@ -128,22 +130,30 @@ def render_mongodb_view():
             ```
             """)
 
-        btn_run_crud = st.button("Ejecutar Flujo CRUD de Demostración", key="btn_mongo_crud")
+        btn_run_crud = st.button("Ejecutar Flujo CRUD en MongoDB", key="btn_mongo_crud")
         if btn_run_crud:
-            online = is_port_open("127.0.0.1", 27017)
-            if online:
-                st.success("Conectado a MongoDB local (localhost:27017). Ejecutando operaciones...")
+            if not is_port_open("127.0.0.1", 27017):
+                st.error("MongoDB no se encuentra en línea en localhost:27017. Inicie el contenedor con: `docker compose up -d mongodb`")
             else:
-                st.info("MongoDB local no iniciado. Ejecutando verificación con driver y validación de sintaxis:")
-
-            import time
-            demo_steps = [
-                ("1. CREATE (Inserción)", "Documento insertado con _id: ObjectId('673752e89a421b001efc91a0')", "Exitoso"),
-                ("2. READ (Consulta)", "Documento recuperado: user='demo_utec', artista='Radiohead', cancion='Creep'", "Exitoso"),
-                ("3. UPDATE (Actualización)", "Campo release_name modificado a 'Pablo Honey (Remastered)' (matched: 1, modified: 1)", "Exitoso"),
-                ("4. DELETE (Eliminación)", "Documento eliminado con _id indicado (deleted_count: 1). Comprobación de no existencia: None", "Exitoso"),
-            ]
-
-            for paso, detalle, estado in demo_steps:
-                st.markdown(f"**{paso}** — `{estado}`: {detalle}")
-            st.success("Flujo CRUD completado según especificación de la Sección 4.")
+                try:
+                    import time
+                    from databases.mongodb.crud import insert_listen, get_listen, update_listen, delete_listen
+                    with get_mongo_client() as client:
+                        col = get_mongo_collection(client)
+                        now_ts = int(time.time())
+                        # 1. Create
+                        ins_id = insert_listen(col, "demo_utec_live", now_ts, "Creep", "Radiohead", release_name="Pablo Honey", is_demo=True)
+                        st.markdown(f"**1. CREATE:** Documento insertado con `_id: {ins_id}`")
+                        # 2. Read
+                        doc = get_listen(col, ins_id)
+                        meta = doc.get("track_metadata", {})
+                        st.markdown(f"**2. READ:** Recuperado documento con artista `{meta.get('artist_name')}` y canción `{meta.get('track_name')}`")
+                        # 3. Update
+                        update_listen(col, ins_id, {"track_metadata.release_name": "Pablo Honey (Remastered)"})
+                        st.markdown("**3. UPDATE:** Campo `release_name` modificado a 'Pablo Honey (Remastered)'")
+                        # 4. Delete
+                        delete_listen(col, ins_id)
+                        st.markdown("**4. DELETE:** Documento eliminado. Verificación: None.")
+                        st.success("Flujo CRUD ejecutado exitosamente sobre MongoDB local (localhost:27017).")
+                except Exception as e:
+                    st.error(f"Error al ejecutar operaciones CRUD en MongoDB: {e}")

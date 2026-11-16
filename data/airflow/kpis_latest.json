@@ -1,0 +1,90 @@
+{
+  "_id": "scheduled__2026-11-14T00:00:00+00:00",
+  "run_id": "scheduled__2026-11-14T00:00:00+00:00",
+  "fecha_logica": "2026-11-14T00:00:00+00:00",
+  "generado_en": "2026-11-15T05:31:15+00:00",
+  "dia_referencia": "2026-10-26",
+  "mes_referencia": "2026-10",
+  "kpis": {
+    "escuchas_por_dia": {
+      "nombre": "Escuchas procesadas por día",
+      "valor": 1359824,
+      "unidad": "escuchas",
+      "dia": "2026-10-26",
+      "fuente": "cassandra.daily_stats"
+    },
+    "crecimiento_diario_pct": {
+      "nombre": "Crecimiento diario de escuchas",
+      "valor": 3364.0,
+      "unidad": "%",
+      "dia": "2026-10-26",
+      "fuente": "cassandra.daily_stats"
+    },
+    "escuchas_por_usuario_activo": {
+      "nombre": "Escuchas promedio por usuario activo",
+      "valor": 52.3,
+      "unidad": "escuchas/usuario",
+      "usuarios_activos": 26020,
+      "dia": "2026-10-26",
+      "fuente": "cassandra.daily_stats"
+    },
+    "participacion_artista_lider": {
+      "nombre": "Participación del artista líder del mes",
+      "valor": 12.65,
+      "unidad": "%",
+      "artista": "BTS",
+      "escuchas": 48640,
+      "mes": "2026-10",
+      "fuente": "cassandra.top_artists_by_month"
+    },
+    "entidad_mas_conectada": {
+      "nombre": "Artista con más oyentes en el grafo",
+      "valor": 1137,
+      "unidad": "oyentes",
+      "artista": "Linkin Park",
+      "relacion": "(:Usuario)-[:ESCUCHA_ARTISTA]->(:Artista)",
+      "fuente": "neo4j"
+    }
+  },
+  "seguimiento": {
+    "mongo_documentos": 4000000,
+    "mongo_insertados_corrida": 100000,
+    "cassandra_lotes_cargados": 10,
+    "cassandra_escuchas_cargadas": 4855809,
+    "cassandra_lotes_nuevos_corrida": 1,
+    "neo4j_usuarios": 26394,
+    "neo4j_canciones": 651230,
+    "neo4j_escuchas": 4855809,
+    "neo4j_comunidades": 13,
+    "neo4j_modularidad": 0.7825,
+    "neo4j_cobertura_recomendaciones": 0.6203
+  },
+  "serie_diaria": [
+    {"dia": "2026-10-01", "escuchas": 14200, "usuarios_activos": 1850, "escuchas_por_usuario": 7.68, "crecimiento_pct": 2.1},
+    {"dia": "2026-10-02", "escuchas": 14800, "usuarios_activos": 1900, "escuchas_por_usuario": 7.79, "crecimiento_pct": 4.2},
+    {"dia": "2026-10-03", "escuchas": 16200, "usuarios_activos": 2050, "escuchas_por_usuario": 7.9, "crecimiento_pct": 9.5},
+    {"dia": "2026-10-04", "escuchas": 15900, "usuarios_activos": 2010, "escuchas_por_usuario": 7.91, "crecimiento_pct": -1.9},
+    {"dia": "2026-10-05", "escuchas": 15100, "usuarios_activos": 1940, "escuchas_por_usuario": 7.78, "crecimiento_pct": -5.0},
+    {"dia": "2026-10-06", "escuchas": 14900, "usuarios_activos": 1920, "escuchas_por_usuario": 7.76, "crecimiento_pct": -1.3},
+    {"dia": "2026-10-07", "escuchas": 15400, "usuarios_activos": 1980, "escuchas_por_usuario": 7.78, "crecimiento_pct": 3.4},
+    {"dia": "2026-10-08", "escuchas": 16100, "usuarios_activos": 2030, "escuchas_por_usuario": 7.93, "crecimiento_pct": 4.5},
+    {"dia": "2026-10-09", "escuchas": 16800, "usuarios_activos": 2100, "escuchas_por_usuario": 8.0, "crecimiento_pct": 4.3},
+    {"dia": "2026-10-10", "escuchas": 17500, "usuarios_activos": 2180, "escuchas_por_usuario": 8.03, "crecimiento_pct": 4.2},
+    {"dia": "2026-10-11", "escuchas": 17100, "usuarios_activos": 2150, "escuchas_por_usuario": 7.95, "crecimiento_pct": -2.3},
+    {"dia": "2026-10-12", "escuchas": 16900, "usuarios_activos": 2120, "escuchas_por_usuario": 7.97, "crecimiento_pct": -1.2},
+    {"dia": "2026-10-13", "escuchas": 17400, "usuarios_activos": 2170, "escuchas_por_usuario": 8.02, "crecimiento_pct": 3.0},
+    {"dia": "2026-10-14", "escuchas": 18200, "usuarios_activos": 2240, "escuchas_por_usuario": 8.13, "crecimiento_pct": 4.6},
+    {"dia": "2026-10-15", "escuchas": 18900, "usuarios_activos": 2310, "escuchas_por_usuario": 8.18, "crecimiento_pct": 3.8},
+    {"dia": "2026-10-16", "escuchas": 19500, "usuarios_activos": 2380, "escuchas_por_usuario": 8.19, "crecimiento_pct": 3.2},
+    {"dia": "2026-10-17", "escuchas": 19200, "usuarios_activos": 2350, "escuchas_por_usuario": 8.17, "crecimiento_pct": -1.5},
+    {"dia": "2026-10-18", "escuchas": 18800, "usuarios_activos": 2300, "escuchas_por_usuario": 8.17, "crecimiento_pct": -2.1},
+    {"dia": "2026-10-19", "escuchas": 19600, "usuarios_activos": 2390, "escuchas_por_usuario": 8.2, "crecimiento_pct": 4.3},
+    {"dia": "2026-10-20", "escuchas": 20400, "usuarios_activos": 2460, "escuchas_por_usuario": 8.29, "crecimiento_pct": 4.1},
+    {"dia": "2026-10-21", "escuchas": 21100, "usuarios_activos": 2520, "escuchas_por_usuario": 8.37, "crecimiento_pct": 3.4},
+    {"dia": "2026-10-22", "escuchas": 22500, "usuarios_activos": 2650, "escuchas_por_usuario": 8.49, "crecimiento_pct": 6.6},
+    {"dia": "2026-10-23", "escuchas": 24800, "usuarios_activos": 2820, "escuchas_por_usuario": 8.79, "crecimiento_pct": 10.2},
+    {"dia": "2026-10-24", "escuchas": 28500, "usuarios_activos": 3100, "escuchas_por_usuario": 9.19, "crecimiento_pct": 14.9},
+    {"dia": "2026-10-25", "escuchas": 39250, "usuarios_activos": 3950, "escuchas_por_usuario": 9.94, "crecimiento_pct": 37.7},
+    {"dia": "2026-10-26", "escuchas": 1359824, "usuarios_activos": 26020, "escuchas_por_usuario": 52.26, "crecimiento_pct": 3364.0}
+  ]
+}

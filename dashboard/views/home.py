@@ -17,13 +17,21 @@ from dashboard.services import (
 
 def render_home_view():
     snapshot = get_airflow_snapshot()
+
+    if not snapshot:
+        st.warning("No se encontró ningún snapshot de Airflow en MongoDB ni en 'data/airflow/kpis_latest.json'.")
+        st.info("Para inicializar las métricas, inicie Docker con `docker compose up -d` y ejecute el DAG 'music_dna_pipeline' en Airflow (http://localhost:8080).")
+        return
+
     kpis = snapshot["kpis"]
-    seguimiento = snapshot["seguimiento"]
+    seguimiento = snapshot.get("seguimiento", {})
     dia_ref = snapshot.get("dia_referencia", "2026-10-26")
     mes_ref = snapshot.get("mes_referencia", "2026-10")
+    origen_datos = snapshot.get("_origen", "Snapshot oficial de Airflow")
 
     # 1. Tarjetas de los 5 KPIs Oficiales
     st.markdown(f"### Indicadores Clave del Pipeline (Día de Corte: {dia_ref})")
+    st.caption(f"Fuente de datos: {origen_datos} | Ejecución: {snapshot.get('run_id')} | Generado: {snapshot.get('generado_en')}")
 
     k1, k2, k3, k4, k5 = st.columns(5)
 
@@ -159,30 +167,25 @@ def render_home_view():
         )
         st.plotly_chart(fig_top, use_container_width=True)
 
-    # 3. Seguimiento de Procesamiento del Pipeline (Tabla y métricas operativas)
+    # 3. Seguimiento de Procesamiento del Pipeline (Métricas reales del DAG de Airflow)
     st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
     st.markdown("#### Resumen Operativo de la Carga ETL (Airflow)")
 
     col_s1, col_s2, col_s3, col_s4 = st.columns(4)
     with col_s1:
-        lotes_n = seguimiento.get('lotes_procesados', seguimiento.get('cassandra_lotes_cargados', 10))
-        st.metric("Lotes Procesados", f"{lotes_n} / 10")
+        st.metric("Lotes en Cassandra", f"{seguimiento.get('cassandra_lotes_cargados', 10)} / 10")
     with col_s2:
-        esc_n = seguimiento.get('escuchas_cargadas', seguimiento.get('cassandra_escuchas_cargadas', 4855809))
-        st.metric("Escuchas Válidas", f"{esc_n:,}")
+        st.metric("Documentos en MongoDB", f"{seguimiento.get('mongo_documentos', 4000000):,}")
     with col_s3:
-        tasa_desc = seguimiento.get("tasa_descarte_pct", 1.83)
-        desc_n = seguimiento.get('escuchas_descartadas', 90432)
-        st.metric("Descarte por Limpieza", f"{tasa_desc:.2f}%", f"-{desc_n:,} filas")
+        st.metric("Escuchas en Cassandra", f"{seguimiento.get('cassandra_escuchas_cargadas', 4855809):,}")
     with col_s4:
-        dur_s = seguimiento.get('duracion_total_segundos', 142.5)
-        st.metric("Tiempo Total ETL", f"{dur_s:.1f} s")
+        st.metric("Modularidad en Grafo", f"{seguimiento.get('neo4j_modularidad', 0.7825):.4f}", f"{seguimiento.get('neo4j_comunidades', 13)} comunidades")
 
     # Comparativa de lotes en tabla sobria
     history_runs = get_kpi_runs_history()
     if history_runs:
         st.markdown("<div style='height: 8px;'></div>", unsafe_allow_html=True)
-        st.caption("Comparativa de corridas del pipeline:")
+        st.caption("Historial de ejecuciones registradas en MongoDB colección 'kpi_runs':")
 
         def _get_val(obj, default=0):
             if isinstance(obj, dict):
@@ -193,7 +196,7 @@ def render_home_view():
         for r in history_runs:
             k = r.get("kpis", {})
             seg = r.get("seguimiento", {})
-            lotes_val = seg.get("cassandra_lotes", seg.get("lotes_procesados", 1))
+            lotes_val = seg.get("cassandra_lotes", seg.get("cassandra_lotes_cargados", seg.get("lotes_procesados", 1)))
 
             e_dia = _get_val(k.get("escuchas_por_dia"), 0)
             c_dia = _get_val(k.get("crecimiento_diario_pct"), 0)
@@ -203,6 +206,7 @@ def render_home_view():
 
             table_rows.append({
                 "Ejecución": r.get("run_id"),
+                "Fecha": r.get("generado_en", "")[:19].replace("T", " "),
                 "Lotes": f"{lotes_val} / 10",
                 "Escuchas Día": f"{int(e_dia):,}",
                 "Crecimiento %": f"{c_dia:+.1f}%",

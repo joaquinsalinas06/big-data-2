@@ -8,7 +8,8 @@ data/neo4j/
 *.zst
 *.part
 *.sha256
-data/airflow/
+data/airflow/*
+!data/airflow/kpis_latest.json
 data/*.sqlite3
 
 # Airflow: logs de las corridas y plugins locales (solo se versiona la carpeta)

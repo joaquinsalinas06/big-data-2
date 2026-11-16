@@ -40,7 +40,7 @@ La interfaz se organizó siguiendo un esquema modular basado en pestañas (\code
 
 Para garantizar una presentación sobria y adecuada para un proyecto de ingeniería de datos, el diseño omite emoticonos y elementos decorativos innecesarios. Se forzó una configuración de tema claro con tipografía en tonos oscuros (\texttt{\#0f172a}), contenedores con bordes sutiles y fondos claros (\texttt{\#f8fafc}).
 
-Asimismo, el servicio de conectividad (\code{dashboard/services.py}) implementa una verificación mediante sockets locales sobre los puertos 27017, 9042 y 7687 con un tiempo límite de 150~ms. Esto previene bloqueos por tiempos de espera prolongados en la interfaz web si los contenedores Docker se encuentran detenidos, conmutando de forma transparente al snapshot local validado de Airflow.
+Asimismo, el servicio de conectividad (\code{dashboard/services.py}) implementa una verificación rápida de sockets sobre los puertos 27017, 9042 y 7687 con un tiempo límite de 150~ms. Si los contenedores Docker se encuentran activos, las consultas y operaciones CRUD se despachan directamente contra las instancias en vivo; en caso contrario, la interfaz reporta con transparencia el estado fuera de línea e instruye el levantamiento de los servicios requeridos, manteniendo el acceso a las métricas consolidadas mediante el snapshot oficial de Airflow.
 
 \subsection{Vista de inicio y despliegue de indicadores}
 
@@ -68,7 +68,7 @@ La figura~\ref{fig:dashboard-cassandra} muestra la vista analítica de Cassandra
 \nota{Evolución temporal, distribución horaria UTC, consola de consultas CQL y panel de demostración CRUD.}
 \end{figure}
 
-En la figura~\ref{fig:dashboard-neo4j} se expone el módulo de grafos en Neo4j. En su consola de consultas Cypher, se observa la ejecución de la consulta de artistas con mayor cantidad de oyentes únicos (\code{list_artists}), reportando una latencia de 157{,}0~ms y confirmando a Linkin Park con 1\,137 oyentes en el primer lugar. Las otras pestañas del módulo permiten explorar las comunidades de Louvain, los artistas puente y el motor de recomendaciones por similitud de Jaccard.
+En la figura~\ref{fig:dashboard-neo4j} se expone el módulo de grafos en Neo4j. Su consola interactiva permite seleccionar y despachar consultas Cypher sobre el driver oficial de Neo4j en vivo midiendo la latencia de respuesta en milisegundos en tiempo real, interactuar con las comunidades de Louvain, identificar artistas puente y explorar recomendaciones explicables basadas en el coeficiente de similitud de Jaccard.
 
 \begin{figure}[H]
 \caption{Vista de Neo4j: consola de consultas Cypher y análisis de relaciones}

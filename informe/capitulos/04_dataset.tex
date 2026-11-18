@@ -3,7 +3,7 @@
 
 \subsection{Origen}
 
-ListenBrainz publica sus datos de escuchas en varios formatos \citep{listenbrainzdumps}: volcados completos (del orden de cientos de GB), volcados incrementales con las escuchas recibidas desde el incremental anterior y exportaciones orientadas a Spark. Elegimos un incremental porque cumple con holgura el mínimo de 50\,000 registros de la consigna, se descarga y procesa en una laptop y, al ser parte de una serie que se publica periódicamente, encaja con la idea de actualizaciones incrementales. Para que todo el grupo trabaje con la misma versión fijamos un incremental concreto \citep{incremental2746}. La tabla~\ref{tab:dataset} resume sus características.
+ListenBrainz publica sus datos de escuchas en varios formatos: volcados completos (del orden de cientos de GB), volcados incrementales con las escuchas recibidas desde el incremental anterior y exportaciones orientadas a Spark. Elegimos un incremental porque cumple con holgura el mínimo de 50\,000 registros de la consigna, se descarga y procesa en una laptop y, al ser parte de una serie que se publica periódicamente, encaja con la idea de actualizaciones incrementales. Para que todo el grupo trabaje con la misma versión fijamos un incremental concreto. La tabla~\ref{tab:dataset} resume sus características.
 
 \begin{table}[H]
 \centering
@@ -31,7 +31,7 @@ La descarga la hacen \code{scripts/download_dataset.sh} (Linux y macOS) y \code{
 
 \subsection{Estructura de cada registro}
 
-Cada línea del archivo es un objeto JSON que representa una escucha, con la estructura que documenta ListenBrainz para el volcado de escuchas \citep{listenbrainzdumps}. El siguiente ejemplo tiene la estructura real pero datos ficticios, para no publicar datos personales:
+Cada línea del archivo es un objeto JSON que representa una escucha, con la estructura que documenta ListenBrainz para el volcado de escuchas. El siguiente ejemplo tiene la estructura real pero datos ficticios, para no publicar datos personales:
 
 \begin{lstlisting}[language=JSON]
 {
@@ -70,7 +70,7 @@ Campo & Significado & Observaciones \\
 \end{tabularx}
 \end{table}
 
-Los cuatro últimos campos están anidados dentro de \code{track_metadata}. Conviene no confundir \code{timestamp} con \code{listened_at}: algunas respuestas de la API de ListenBrainz usan \code{listened_at} \citep{listenbrainzjson}, pero el archivo descargado usa \code{timestamp}, y todos los scripts del repositorio están adaptados a ese formato.
+Los cuatro últimos campos están anidados dentro de \code{track_metadata}. Conviene no confundir \code{timestamp} con \code{listened_at}: algunas respuestas de la API de ListenBrainz usan \code{listened_at}, pero el archivo descargado usa \code{timestamp}, y todos los scripts del repositorio están adaptados a ese formato.
 
 \subsection{Volumen y exploración}
 

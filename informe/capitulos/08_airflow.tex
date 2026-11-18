@@ -1,7 +1,7 @@
 \section{Explicación del DAG de Airflow}
 \label{cap:airflow}
 
-El DAG \code{music_dna_pipeline} automatiza el flujo: toma el volcado de ListenBrainz, lo valida, lo carga en MongoDB, Cassandra y Neo4j y calcula los KPIs \citep{airflow}. Se ejecuta a diario (\code{@daily}) y en cada corrida agrega un bloque nuevo de escuchas, lo que simula la llegada incremental de datos. Cada tarea llama a las funciones de \code{databases/}, las mismas que se usan por consola, de modo que lo probado en cada base es lo que corre en Airflow. El código está en \code{airflow/dags/music_dna_dag.py}.
+El DAG \code{music_dna_pipeline} automatiza el flujo: toma el volcado de ListenBrainz, lo valida, lo carga en MongoDB, Cassandra y Neo4j y calcula los KPIs. Se ejecuta a diario (\code{@daily}) y en cada corrida agrega un bloque nuevo de escuchas, lo que simula la llegada incremental de datos. Cada tarea llama a las funciones de \code{databases/}, las mismas que se usan por consola, de modo que lo probado en cada base es lo que corre en Airflow. El código está en \code{airflow/dags/music_dna_dag.py}.
 
 \subsection{Airflow dentro del stack de Docker}
 
@@ -65,7 +65,7 @@ La figura~\ref{fig:airflow-graph} muestra el DAG en la interfaz de Airflow, con 
 \subsection{Las seis tareas}
 
 \begin{description}
-  \item[\code{extraer_datos}] Si el JSONL ya está en \code{data/processed/}, no descarga nada; si no, ejecuta \code{scripts/download_dataset.sh --extract}, que baja el incremental 2746 de MetaBrainz \citep{incremental2746}, verifica su SHA-256 y extrae el archivo.
+  \item[\code{extraer_datos}] Si el JSONL ya está en \code{data/processed/}, no descarga nada; si no, ejecuta \code{scripts/download_dataset.sh --extract}, que baja el incremental 2746 de MetaBrainz, verifica su SHA-256 y extrae el archivo.
   \item[\code{validar_y_limpiar}] Ejecuta \code{scripts/validate_dataset.py}, que comprueba en streaming cada línea y los 4\,855\,809 registros esperados (sección~\ref{cap:dataset}). Si falla, las cargas no se ejecutan. La limpieza registro por registro la hace cada loader, porque cada base exige cosas distintas.
   \item[\code{cargar_mongodb}] Llama a \code{load_to_mongodb} con \code{limit=100000}; el SQLite de estado guarda el byte donde quedó y las huellas ya insertadas, así que cada corrida sigue donde terminó la anterior.
   \item[\code{cargar_cassandra}] Crea el esquema (\texttt{IF NOT EXISTS}) y llama a \code{load_listens} con \code{max_batches=1}: carga un lote de 500\,000 líneas, lo registra y recalcula los agregados.

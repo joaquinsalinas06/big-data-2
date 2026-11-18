@@ -1,7 +1,7 @@
 \section{Modelo de grafo en Neo4j}
 \label{cap:neo4j}
 
-Neo4j modela las relaciones entre usuarios, canciones y artistas \citep{neo4j}; sobre ese grafo se calculan afinidades, comunidades, recomendaciones y la diversidad de escucha. El código está en \code{databases/neo4j/}, y el análisis de comunidades usa NetworkX \citep{networkx}.
+Neo4j modela las relaciones entre usuarios, canciones y artistas; sobre ese grafo se calculan afinidades, comunidades, recomendaciones y la diversidad de escucha. El código está en \code{databases/neo4j/}, y el análisis de comunidades usa NetworkX.
 
 \subsection{Nodos y relaciones}
 
@@ -141,7 +141,7 @@ El análisis (\code{databases/neo4j/analyze.py}) usa los 500 artistas con más o
 J(a,b) = \frac{|A(a) \cap A(b)|}{|A(a) \cup A(b)|}
 \]
 
-Se conservan los pares con al menos 10 usuarios en común y $J \geq 0{,}05$, y los 10 vecinos más afines de cada artista. Sobre ese grafo ponderado se detectan comunidades con Louvain \citep{blondel2008} (resolución 1, semilla 42) y se guardan en Neo4j las relaciones \code{AFIN_A}, las comunidades y los indicadores.
+Se conservan los pares con al menos 10 usuarios en común y $J \geq 0{,}05$, y los 10 vecinos más afines de cada artista. Sobre ese grafo ponderado se detectan comunidades con Louvain (resolución 1, semilla 42) y se guardan en Neo4j las relaciones \code{AFIN_A}, las comunidades y los indicadores.
 
 El coeficiente puente de cada artista mide cómo se reparten sus conexiones entre comunidades. Si $w_{a,c}$ es la suma de los pesos de Jaccard de las aristas de $a$ hacia artistas de la comunidad $c$ y $W_a$ la suma total:
 

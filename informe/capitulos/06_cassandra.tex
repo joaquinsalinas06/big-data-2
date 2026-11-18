@@ -1,7 +1,7 @@
 \section{Modelo de datos de Cassandra}
 \label{cap:cassandra}
 
-Cassandra guarda las escuchas como serie temporal y las métricas agregadas por fecha de las que salen los KPIs \citep{cassandra}. MongoDB conserva el documento original y Neo4j las relaciones; aquí está lo que se consulta por tiempo y en volumen. El código está en \code{databases/cassandra/}.
+Cassandra guarda las escuchas como serie temporal y las métricas agregadas por fecha de las que salen los KPIs. MongoDB conserva el documento original y Neo4j las relaciones; aquí está lo que se consulta por tiempo y en volumen. El código está en \code{databases/cassandra/}.
 
 \subsection{Por qué este diseño}
 
@@ -56,13 +56,7 @@ CREATE TABLE IF NOT EXISTS music_dna.daily_stats (
 );
 \end{lstlisting}
 
-En el modelo tomamos tres decisiones que conviene explicar:
-
-\begin{itemize}
-  \item \code{listens_by_user} se particiona por usuario y mes, no solo por usuario. Así una partición no crece sin límite: la más grande del dataset tiene 14\,205 filas. Particionar solo por usuario habría acumulado todo el historial de los usuarios más activos en una sola partición.
-  \item \code{top_artists_by_month} usa \code{rank} como clustering porque Cassandra solo ordena por columnas de clustering. El ranking se calcula al cargar y la consulta es un \texttt{SELECT ... LIMIT 10}.
-  \item No se guarda \code{user_name}: con \code{user_id} alcanza y el dashboard no necesita exponer nombres de usuario.
-\end{itemize}
+\code{listens_by_user} se particiona por usuario y mes, no solo por usuario, para que una partición no crezca sin límite: la más grande del dataset tiene 14\,205 filas. \code{top_artists_by_month} usa \code{rank} como clustering porque Cassandra solo ordena por columnas de clustering; el ranking se calcula al cargar y la consulta es un \texttt{SELECT ... LIMIT 10}. No se guarda \code{user_name}, pues con \code{user_id} alcanza.
 
 \code{listen_id} es un UUID determinista (UUID versión 5) calculado a partir del usuario, el \code{timestamp}, el \code{recording_msid}, el artista y la canción. La misma escucha siempre genera el mismo id, y eso es lo que hace que recargar no duplique filas.
 
@@ -70,13 +64,7 @@ En el modelo tomamos tres decisiones que conviene explicar:
 
 \code{databases/cassandra/loader.py} lee el JSONL en lotes de 500\,000 líneas. Para cada lote limpia las líneas (\code{user_id} y \code{timestamp} enteros, artista y canción no vacíos), descarta las escuchas repetidas dentro del lote, escribe las filas en \code{listens_by_user} y registra el lote en \code{load_batches} con un id formado por el nombre del archivo y el rango de líneas (por ejemplo \code{listens_full.jsonl:1-500000}). Al terminar recalcula con todo lo cargado las tablas agregadas (\code{daily_stats}, \code{top_artists_by_month}, \code{artist_monthly_listens} y \code{user_daily_listens}) y las sobrescribe.
 
-Repetir la carga no duplica nada: las escuchas tienen id determinista, los lotes registrados no se reescriben y los agregados se reemplazan en lugar de sumarse. \code{load_listens} acepta un máximo de lotes nuevos por ejecución, que Airflow usa para cargar un lote por corrida (sección~\ref{cap:airflow}); el tamaño de lote debe mantenerse, porque el id del lote depende de él. Tres optimizaciones aceleraron la carga:
-
-\begin{itemize}
-  \item Las filas de una misma partición se envían juntas en un \texttt{UNLOGGED BATCH} de hasta 30 filas, unas 13 veces más rápido que una escritura por fila.
-  \item Los agregados se recalculan y sobrescriben en lugar de usar columnas \code{counter}, que leen antes de escribir y suman dos veces si se repite un lote.
-  \item Los campos opcionales usan \code{UNSET_VALUE} en lugar de \code{None}, para no crear un tombstone por fila.
-\end{itemize}
+Repetir la carga no duplica nada: las escuchas tienen id determinista, los lotes registrados no se reescriben y los agregados se reemplazan en lugar de sumarse. \code{load_listens} acepta un máximo de lotes nuevos por ejecución, que Airflow usa para cargar un lote por corrida (sección~\ref{cap:airflow}); el tamaño de lote debe mantenerse, porque el id del lote depende de él. Tres optimizaciones aceleraron la carga. Las filas de una misma partición se envían juntas en un \texttt{UNLOGGED BATCH} de hasta 30 filas, unas 13 veces más rápido que una escritura por fila. Los agregados se recalculan y sobrescriben en lugar de usar columnas \code{counter}, que leen antes de escribir y suman dos veces si se repite un lote. Y los campos opcionales usan \code{UNSET_VALUE} en lugar de \code{None}, para no crear un tombstone por fila.
 
 Cargando el archivo completo del incremental 2746 (Cassandra~5.0 en Docker, un nodo con heap de 2~GB, tablas vacías), los 10 lotes tardaron 343~s, entre 7\,500 y 21\,600 filas por segundo, y el recálculo de los agregados 196~s: 553~s en total (unos 9 minutos). Una segunda ejecución sin lotes nuevos dejó los totales intactos (4\,855\,809). La tabla~\ref{tab:cassandra-filas} muestra las filas de cada tabla.
 

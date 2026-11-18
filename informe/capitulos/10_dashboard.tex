@@ -1,7 +1,7 @@
 \section{Dashboard analítico}
 \label{cap:dashboard}
 
-El dashboard está hecho en Streamlit \citep{streamlit} y se conecta a las tres bases. No recalcula los indicadores: consume el snapshot que genera \code{generar_kpis}, disponible en \code{data/airflow/kpis_latest.json} y en la colección \code{kpi_runs} (tabla~\ref{tab:kpis-valores}), y para las vistas en vivo reutiliza las consultas de \code{databases/}. Se organiza en cinco pestañas: resumen general, MongoDB, Cassandra, Neo4j y fichas de KPIs. La tabla~\ref{tab:dashboard} relaciona cada indicador con su visualización.
+El dashboard está hecho en Streamlit y se conecta a las tres bases. No recalcula los indicadores: consume el snapshot que genera \code{generar_kpis}, disponible en \code{data/airflow/kpis_latest.json} y en la colección \code{kpi_runs} (tabla~\ref{tab:kpis-valores}), y para las vistas en vivo reutiliza las consultas de \code{databases/}. Se organiza en cinco pestañas: resumen general, MongoDB, Cassandra, Neo4j y fichas de KPIs. La tabla~\ref{tab:dashboard} relaciona cada indicador con su visualización.
 
 \begin{table}[H]
 \centering

@@ -5,11 +5,7 @@ Queremos responder preguntas sobre los hábitos de escucha de los usuarios de Li
 
 Desde el punto de vista de los datos, estas preguntas no tienen la misma forma:
 
-\begin{itemize}
-  \item Conservar el registro original de cada escucha, con campos opcionales y metadatos que cambian de un registro a otro, es un problema de documentos semiestructurados.
-  \item Contar escuchas por día, calcular crecimiento y armar rankings mensuales sobre millones de filas es un problema de series temporales con consultas conocidas de antemano.
-  \item Encontrar artistas que comparten oyentes, detectar comunidades o recomendar artistas a un usuario a partir de lo que escuchan usuarios parecidos es un problema de relaciones.
-\end{itemize}
+Conservar el registro original de cada escucha, con campos opcionales y metadatos que cambian de un registro a otro, es un problema de documentos semiestructurados. Contar escuchas por día, calcular crecimiento y armar rankings mensuales sobre millones de filas es un problema de series temporales con consultas conocidas de antemano. Y encontrar artistas que comparten oyentes, detectar comunidades o recomendar artistas a partir de lo que escuchan usuarios parecidos es un problema de relaciones.
 
 Una sola base de datos puede guardar todo, pero obliga a resolver mal alguna de estas partes. Un modelo relacional o documental puede contar escuchas por día, pero cada consulta recorre millones de registros si no se precalcula el agregado. Recorrer relaciones de varios saltos (usuario, artista, otro artista, otros usuarios) en una base documental o columnar exige uniones costosas o reconstruir el grafo en memoria. Y una base de grafos no es la herramienta adecuada para guardar millones de documentos JSON originales ni para servir series temporales.
 

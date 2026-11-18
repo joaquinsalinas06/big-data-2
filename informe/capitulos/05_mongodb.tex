@@ -44,24 +44,13 @@ Se crean tres índices compuestos, pensados para las consultas que hace la aplic
 \end{tabularx}
 \end{table}
 
-La validación del módulo comprobó con \code{explain} que las tres consultas usan su índice (etapa \code{IXSCAN}) y que examinan exactamente los documentos que devuelven: por ejemplo, 20 claves examinadas para 20 resultados en la consulta cronológica, con un tiempo de ejecución de 1~ms sobre la colección de prueba de 4\,000\,001 documentos que se describe en la subsección siguiente.
+La validación del módulo comprobó con \code{explain} que las tres consultas usan su índice (etapa \code{IXSCAN}) y que examinan exactamente los documentos que devuelven: por ejemplo, 20 claves examinadas para 20 resultados en la consulta cronológica, con un tiempo de ejecución de 1~ms sobre la colección de prueba de 4\,000\,001 documentos.
 
 \subsection{Carga por lotes}
 
-La carga masiva está en \code{databases/mongodb/loader.py}, cuya función \code{load_to_mongodb} llama al importador de \code{app/services/import_service.py}. El importador lee el archivo línea a línea y procesa cada registro así:
+La carga masiva está en \code{databases/mongodb/loader.py}, cuya función \code{load_to_mongodb} usa el importador de \code{app/services/import_service.py}. El importador lee el archivo línea a línea, valida cada documento con el modelo Pydantic \code{ListenCreate} y descarta los que ya cargó, comparando la huella SHA-256 del documento con las guardadas en un SQLite auxiliar. Los documentos nuevos se insertan en lotes de 2000 con \code{insert_many(ordered=False)}, y después de cada lote se guarda el byte del archivo donde quedó la lectura (checkpoint).
 
-\begin{enumerate}
-  \item Interpreta la línea como JSON y valida el documento con el modelo Pydantic \code{ListenCreate}: \code{user_name} con entre 1 y 1000 caracteres, \code{timestamp} entero dentro del rango de fechas válido, nombre de canción y de artista no vacíos y claves de metadatos que no empiecen con \code{$} ni contengan puntos, que MongoDB no admite. Las líneas inválidas se registran en un archivo de errores y se saltan.
-  \item Calcula la huella SHA-256 del documento serializado con claves ordenadas y la compara con las huellas ya cargadas, que guarda en un SQLite auxiliar. Si ya existe, cuenta como duplicado y no se inserta.
-  \item Agrupa los documentos nuevos en lotes (2000 por defecto, como máximo 5000) y los inserta con \code{insert_many(ordered=False)}. Si un documento ya estaba en la colección, el error de clave duplicada se ignora y el resto del lote se inserta igual.
-  \item Después de cada lote guarda en el SQLite las huellas nuevas y el byte del archivo donde quedó la lectura (checkpoint).
-\end{enumerate}
-
-Gracias al checkpoint, una carga interrumpida continúa desde el último lote confirmado, y como las huellas se reconstruyen a partir de la colección al empezar, lo que alcanzó a insertarse antes de la interrupción no se duplica. Un archivo de bloqueo impide que dos cargas corran a la vez sobre el mismo estado. La función acepta un \code{limit} de documentos por ejecución y un tope total de 4\,000\,000 documentos en la colección.
-
-Al integrar el módulo con Airflow corregimos el cálculo de ese tope. \code{load_to_mongodb} le pasaba \code{limit} como total objetivo de la colección, así que desde la segunda ejecución el objetivo ya estaba alcanzado y no se insertaba nada. Ahora el objetivo es la cantidad actual de documentos más \code{limit}, con el tope de 4\,000\,000, y cada ejecución agrega el siguiente bloque del archivo.
-
-Las pruebas de rendimiento del módulo se hicieron antes de integrarlo al pipeline, sobre una colección de 4\,000\,001 documentos. La importación que la llenó procesó 4\,000\,000 de líneas en unos 5\,570 segundos: insertó 3\,950\,000 y marcó como duplicadas 50\,000, que eran los documentos de una prueba anterior. Esa colección se llenó con el incremental 2754 (31 de octubre de 2026) y no con el 2746, así que sus cifras sirven para medir el loader y los índices, pero no se comparan con las de Cassandra y Neo4j. En el pipeline, MongoDB se carga con el incremental 2746, igual que las otras dos bases (sección~\ref{sec:airflow-corridas}).
+Con el checkpoint, una carga interrumpida continúa desde el último lote confirmado, y como las huellas se reconstruyen desde la colección al empezar, nada se duplica. La función acepta un \code{limit} de documentos por ejecución y un tope total de 4\,000\,000 documentos; cada ejecución agrega el siguiente bloque del archivo, que es lo que usa Airflow. En las pruebas del módulo, la importación de 4\,000\,000 de líneas tardó unos 5\,570 segundos.
 
 \subsection{Operaciones CRUD}
 
@@ -83,7 +72,7 @@ Eliminar & \code{delete_listen} & \code{delete_one} por \code{_id} y comprobaci�
 \end{tabularx}
 \end{table}
 
-La figura~\ref{fig:mongo-crud} muestra la demostración ejecutada sin pausas contra la colección que dejó Airflow. El documento de prueba usa un usuario ficticio y al final se borra, así que la colección queda con los mismos documentos.
+La figura~\ref{fig:mongo-crud} muestra la demostración ejecutada sin pausas contra la colección que dejó Airflow.
 
 \begin{figure}[H]
 \caption{Demostración del CRUD en MongoDB}
@@ -92,11 +81,11 @@ La figura~\ref{fig:mongo-crud} muestra la demostración ejecutada sin pausas con
 \includegraphics[width=\textwidth]{figuras/mongo_crud.png}
 \end{figure}
 
-El módulo incluye además una API REST con FastAPI sobre la misma colección, con documentación interactiva en Swagger. Las rutas bajo \code{/listens} cubren creación (\code{POST}), consulta por identificador y listado paginado (\code{GET}), actualización parcial y total (\code{PATCH} y \code{PUT}) y eliminación (\code{DELETE}), además de un resumen estadístico y un top de artistas. Cada solicitud pasa por la ruta, el modelo Pydantic que valida los campos (y responde 422 si son incorrectos antes de escribir en la base), un servicio que arma los filtros y un repositorio que ejecuta la operación con PyMongo. En la validación final se ejecutaron tres rondas completas de CRUD por HTTP contra la colección real y la cantidad de documentos quedó igual antes y después.
+El módulo incluye además una API REST con FastAPI sobre la misma colección, con documentación interactiva en Swagger. Las rutas bajo \code{/listens} cubren creación (\code{POST}), consulta por identificador y listado paginado (\code{GET}), actualización parcial y total (\code{PATCH} y \code{PUT}) y eliminación (\code{DELETE}), además de un resumen estadístico y un top de artistas. Cada solicitud pasa por la ruta, el modelo Pydantic que valida los campos (responde 422 si son incorrectos), un servicio que arma los filtros y un repositorio que ejecuta la operación con PyMongo.
 
 \subsection{Consultas y agregaciones}
 
-\code{databases/mongodb/queries.py} define siete agregaciones: usuarios únicos, artistas únicos, top 5 de artistas, top 10 de canciones (agrupadas por artista y título), top 5 de usuarios, duración promedio de las pistas que traen \code{duration_ms} en \code{additional_info} y escuchas por día. La última convierte el \code{timestamp} a fecha y agrupa por día:
+\code{databases/mongodb/queries.py} define siete agregaciones: usuarios únicos, artistas únicos, top 5 de artistas, top 10 de canciones, top 5 de usuarios, duración promedio de las pistas y escuchas por día. Esta última convierte el \code{timestamp} a fecha y agrupa por día:
 
 \begin{lstlisting}[language=Python]
 "listens_by_day": [
@@ -108,6 +97,4 @@ El módulo incluye además una API REST con FastAPI sobre la misma colección, c
 ],
 \end{lstlisting}
 
-Estas agregaciones recorren la colección completa y sirven para exploración. Los indicadores que se consultan siempre, como las escuchas por día, se precalculan en Cassandra, que los sirve en milisegundos.
-
-MongoDB guarda también la colección \code{kpi_runs}, donde Airflow deja un documento por corrida con los cinco KPIs, las métricas de seguimiento y la serie diaria reciente (sección~\ref{cap:kpis}).
+Estas agregaciones sirven para exploración; los indicadores recurrentes se precalculan en Cassandra. MongoDB guarda además la colección \code{kpi_runs}, con un documento por corrida de Airflow (sección~\ref{cap:kpis}).

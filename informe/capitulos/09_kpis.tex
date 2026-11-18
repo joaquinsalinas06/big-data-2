@@ -9,7 +9,7 @@ Los indicadores diarios se calculan sobre un día de referencia $d^{*}$, que es 
 
 En las fórmulas, $E(d)$ es la cantidad de escuchas con fecha $d$ (en UTC) y $U(d)$ la cantidad de usuarios distintos con al menos una escucha ese día. Ambos valores están precalculados en \code{daily_stats}.
 
-Hay que leer todos los valores con una advertencia: el dataset es un lote de ingesta. Los indicadores describen lo que los usuarios enviaron a ListenBrainz en ese periodo, no la popularidad general de los artistas ni el comportamiento de toda la plataforma.
+Los indicadores describen lo que los usuarios enviaron a ListenBrainz en ese periodo.
 
 \subsection{KPI 1: escuchas procesadas por día}
 
@@ -88,36 +88,9 @@ KPI & Corrida 1 (1 lote) & Corrida 2 (2 lotes) & Archivo completo (10 lotes) \\
 5. Artista con más oyentes & Linkin Park, 1\,137 & Linkin Park, 1\,137 & Linkin Park, 1\,137 \\
 \bottomrule
 \end{tabularx}
-\nota{Las dos primeras columnas salen de los snapshots de \code{kpi_runs}. La última repite los valores de la carga completa de Cassandra citados en las secciones de cada KPI; el KPI 5 no depende de Cassandra porque el grafo tiene el lote completo desde la primera corrida.}
 \end{table}
 
 Los cuatro primeros valores crecen de una corrida a otra porque cada lote agrega más escuchas del 26 de octubre, no porque haya cambiado la escucha de los usuarios. La participación de BTS es mayor con pocos lotes (17,37~\% con 2 lotes) que con el archivo completo (12,65~\%): en las primeras líneas del archivo sus escuchas están más concentradas. El KPI 5 no cambia: Linkin Park tiene 1\,137 oyentes distintos en el grafo. Comparado con el KPI 4, muestra la diferencia entre volumen y alcance: BTS es el artista con más escuchas de octubre, pero Linkin Park es el que escucha más gente distinta.
-
-\subsection{Métricas de seguimiento}
-
-Además de los cinco KPIs, cada snapshot guarda métricas que sirven para seguir el estado del pipeline: el total acumulado de documentos en MongoDB y los insertados en la corrida, los lotes y escuchas cargados en Cassandra, los usuarios, canciones y escuchas del grafo, y los indicadores del análisis de Neo4j (cantidad de comunidades, modularidad y cobertura de recomendaciones). El total acumulado en MongoDB y los lotes de Cassandra permiten ver cómo crece la carga incremental de una corrida a otra.
-
-\subsection{Formato del snapshot}
-
-El snapshot tiene la misma forma en \code{data/airflow/kpis_latest.json} y en cada documento de la colección \code{kpi_runs}, pensada para que el dashboard la pueda leer sin transformarla. La tabla~\ref{tab:snapshot} describe sus campos.
-
-\begin{table}[H]
-\centering
-\caption{Campos del snapshot de KPIs}
-\label{tab:snapshot}
-\begin{tabularx}{\textwidth}{l Y}
-\toprule
-Campo & Contenido \\
-\midrule
-\code{run_id}, \code{fecha_logica}, \code{generado_en} & Identificador de la corrida de Airflow, su fecha lógica y el momento en que se generó \\
-\code{dia_referencia}, \code{mes_referencia} & Día $d^{*}$ y mes $m^{*}$ usados en los cálculos \\
-\code{kpis} & Un objeto por indicador con \code{nombre}, \code{valor}, \code{unidad} y \code{fuente}, más los datos propios de cada uno (artista, mes, usuarios activos) \\
-\code{seguimiento} & Las métricas de seguimiento descritas arriba \\
-\code{serie_diaria} & Los últimos 30 días del año de referencia con escuchas, usuarios activos, escuchas por usuario y crecimiento, para graficar la tendencia \\
-\bottomrule
-\end{tabularx}
-\nota{En \code{kpi_runs} el \code{_id} de cada documento es el \code{run_id}, de modo que un reintento de la tarea reemplaza el snapshot en lugar de duplicarlo.}
-\end{table}
 
 La figura~\ref{fig:kpi-runs} muestra los dos documentos de \code{kpi_runs}, uno por corrida, con los cinco indicadores de cada uno. Los valores son los mismos de la tabla~\ref{tab:kpis-valores}.
 
@@ -126,5 +99,4 @@ La figura~\ref{fig:kpi-runs} muestra los dos documentos de \code{kpi_runs}, uno 
 \label{fig:kpi-runs}
 \centering
 \includegraphics[width=\textwidth]{figuras/kpis_latest.png}
-\nota{A la izquierda, el snapshot de la primera corrida (manual); a la derecha, el de la segunda (programada). Se muestra la parte \code{kpis} de cada documento; además de eso, cada snapshot guarda las fechas de referencia, las métricas de seguimiento y la serie diaria.}
 \end{figure}

@@ -11,24 +11,9 @@ En un pipeline que se reintenta, la idempotencia importa más que la velocidad. 
 
 También vimos que hay que conocer el dato antes de interpretarlo. Un incremental describe la ingesta, no la escucha: hay escuchas fechadas en 2005 enviadas en 2026, el 26 de octubre concentra el 28~\% del archivo y el volcado se corta el 27 a las 00:01. Sin esa lectura, el crecimiento de $+3\,364$~\% o la participación de BTS parecerían hallazgos sobre los oyentes, cuando son efectos de cómo llegaron los datos.
 
-Integrar módulos hechos por separado sacó a la luz errores que no se veían en cada parte: el loader de MongoDB no insertaba nada desde la segunda ejecución porque tomaba el límite por corrida como total objetivo, y una variable de entorno de Cassandra tenía un nombre distinto en la plantilla de configuración y en el código. Correr el DAG con pocos lotes mostró otro: la regla del día de referencia descartaba el 26 de octubre, un día completo, porque suponía que el día del corte siempre estaba cargado. Esos errores solo aparecieron al probar el flujo completo.
-
-\subsection{Limitaciones}
-
-\begin{itemize}
-  \item Cassandra corre en un solo nodo con factor de replicación 1 y Airflow usa \code{LocalExecutor} en la misma máquina. Sirve para el proyecto, no tolera caídas ni escala a varios nodos.
-  \item Los artistas se identifican por su nombre tal como viene en el volcado, así que homónimos y variantes de escritura cuentan como artistas distintos, tanto en Cassandra como en Neo4j.
-  \item El corte del volcado deja el 27 de octubre casi vacío y concentra la ingesta en los días anteriores. Los KPIs usan como referencia el último día anterior al corte, pero la serie temporal sigue mostrando saltos que no representan la escucha real.
-  \item Neo4j no se carga de forma incremental: el loader exige el archivo completo y las proporciones de cada usuario se calculan sobre todo el lote. La carga incremental es además simulada, porque siempre se lee el mismo archivo.
-  \item Cada corrida de MongoDB recorre la colección para reconstruir las huellas y cada corrida de Cassandra relee los lotes ya cargados para recalcular los agregados, así que ambas tareas tardan más a medida que crecen las bases.
-  \item Las comunidades dependen de los umbrales del análisis y solo cubren el 23,76~\% de las escuchas, lo que limita lo que se puede concluir sobre la diversidad de los usuarios.
-  \item MetaBrainz retira los incrementales a las pocas semanas. El 2746 ya no se puede descargar, así que reproducir el proyecto depende de conservar el comprimido y su \code{.sha256}.
-  \item El stack completo pide unos 10~GB de memoria. En una laptop de 8~GB funcionó bajando la memoria de las bases y cerrando otras aplicaciones, pero con poca memoria libre la carga de Cassandra necesitó reintentos.
-\end{itemize}
-
 \subsection{Trabajo futuro}
 
-El paso natural es que \code{extraer_datos} descargue el siguiente incremental publicado por ListenBrainz en lugar de recorrer siempre el mismo archivo, y que Neo4j tenga un loader que sume sobre lo ya cargado y recalcule las proporciones de los usuarios afectados. En Cassandra convendría recalcular solo los días y meses que toca cada lote nuevo, y pasar a un clúster de tres nodos con \code{NetworkTopologyStrategy}. Por último, normalizar los artistas con los identificadores de MusicBrainz resolvería el problema de los homónimos en las tres bases.
+Como siguiente paso, \code{extraer_datos} puede descargar el siguiente incremental publicado por ListenBrainz, Neo4j puede cargarse de forma incremental, Cassandra puede recalcular solo los días y meses que toca cada lote, y los artistas pueden normalizarse con los identificadores de MusicBrainz.
 
 \subsection{Repositorio y video}
 

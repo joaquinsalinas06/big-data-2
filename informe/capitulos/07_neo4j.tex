@@ -1,7 +1,7 @@
 \section{Modelo de grafo en Neo4j}
 \label{cap:neo4j}
 
-Neo4j modela las relaciones entre usuarios, canciones y artistas \citep{neo4j}. Sobre ese grafo se calculan afinidades entre artistas que comparten oyentes, comunidades de artistas, recomendaciones explicables y la diversidad de escucha de cada usuario. El código está en \code{databases/neo4j/}, y el análisis de comunidades usa NetworkX \citep{networkx}.
+Neo4j modela las relaciones entre usuarios, canciones y artistas \citep{neo4j}; sobre ese grafo se calculan afinidades, comunidades, recomendaciones y la diversidad de escucha. El código está en \code{databases/neo4j/}, y el análisis de comunidades usa NetworkX \citep{networkx}.
 
 \subsection{Nodos y relaciones}
 
@@ -66,23 +66,20 @@ Relación & Entre & Propiedades \\
 \end{tabularx}
 \end{table}
 
-Una relación \code{ESCUCHO} no representa una reproducción sino todas las de un usuario a una canción: guarda la cantidad y la primera y última fecha. Lo mismo hace \code{ESCUCHA_ARTISTA} por artista, y además guarda la proporción que ese artista representa en el historial del usuario. Agregar así reduce las 4,86 millones de escuchas a 1\,791\,408 relaciones \code{ESCUCHO} y 743\,531 \code{ESCUCHA_ARTISTA}, y deja en la relación lo que necesitan las consultas. Las canciones se identifican por \code{recording_msid}, sin fusionar títulos iguales, y cada relación lleva el lote del que proviene. Las claves únicas se garantizan con restricciones (\texttt{CREATE CONSTRAINT ... REQUIRE n.id IS UNIQUE}).
+Una relación \code{ESCUCHO} resume todas las reproducciones de un usuario a una canción (cantidad, primera y última fecha); \code{ESCUCHA_ARTISTA} hace lo mismo por artista y añade la proporción que representa en el historial del usuario. Esto reduce las 4,86 millones de escuchas a 1\,791\,408 relaciones \code{ESCUCHO} y 743\,531 \code{ESCUCHA_ARTISTA}. Las canciones se identifican por \code{recording_msid}, cada relación lleva su lote, y las claves únicas se garantizan con restricciones (\texttt{CREATE CONSTRAINT ... REQUIRE n.id IS UNIQUE}).
 
-La figura~\ref{fig:neo4j-browser} muestra una parte del grafo cargado, vista en Neo4j Browser: Linkin Park, el artista con más oyentes del lote (sección~\ref{cap:kpis}), y los 21 artistas con los que tiene una relación \code{AFIN_A}. No se muestran nodos \code{Usuario}.
+La figura~\ref{fig:neo4j-browser} muestra el grafo cargado en Neo4j Browser: Linkin Park, el artista con más oyentes (sección~\ref{cap:kpis}), y los 21 artistas con los que tiene una relación \code{AFIN_A}.
 
 \begin{figure}[H]
 \caption{Afinidades de Linkin Park en Neo4j Browser}
 \label{fig:neo4j-browser}
 \centering
 \includegraphics[width=0.62\textwidth]{figuras/neo4j_browser.png}
-\nota{Consulta \texttt{MATCH p = (:Artista \{nombre: 'Linkin Park'\})-[:AFIN\_A]-(:Artista) RETURN p}. Neo4j Browser dibuja además las afinidades entre los vecinos: 69 relaciones entre los 22 artistas.}
 \end{figure}
 
 \subsection{Carga}
 
-La carga tiene dos etapas. \code{prepare} recorre el JSONL completo y agrega las escuchas en un SQLite intermedio (\code{data/neo4j/prepared.sqlite}): usuarios, canciones, artistas, créditos canción--artista, pares usuario--canción y pares usuario--artista con su cantidad y fechas. Al mismo tiempo valida cada fila (\code{user_id} y \code{timestamp} enteros, \code{recording_msid}, título y artista no vacíos), calcula el SHA-256 del archivo y falla si hay filas inválidas, si el archivo cambió durante la lectura o si no tiene exactamente 4\,855\,809 filas.
-
-Después \code{load_data} crea las restricciones, registra el nodo \code{Lote} en estado \code{cargando} y envía los datos en lotes de 1000 filas con \texttt{UNWIND} y \texttt{MERGE}: primero los nodos y después las relaciones. Al final reconcilia: la cantidad de relaciones y la suma de \code{cantidad} de \code{ESCUCHO} y \code{ESCUCHA_ARTISTA} tienen que coincidir con lo preparado. Solo entonces el lote pasa a \code{completo}. Si el lote ya existe con otro SHA-256, la carga se niega a reemplazarlo. Como todo usa \texttt{MERGE}, repetir la carga no duplica nodos ni relaciones.
+La carga tiene dos etapas. \code{prepare} recorre el JSONL completo, valida cada fila, calcula el SHA-256 del archivo y agrega usuarios, canciones, artistas y pares usuario--canción y usuario--artista en un SQLite intermedio (\code{data/neo4j/prepared.sqlite}). Después \code{load_data} crea las restricciones, registra el nodo \code{Lote} en estado \code{cargando} y envía los datos en lotes de 1000 filas con \texttt{UNWIND} y \texttt{MERGE}, primero nodos y luego relaciones. Al final reconcilia que la cantidad de relaciones y la suma de \code{cantidad} coincidan con lo preparado, y solo entonces el lote pasa a \code{completo}. Como todo usa \texttt{MERGE}, repetir la carga no duplica nada.
 
 \begin{lstlisting}[language=Cypher]
 UNWIND $rows AS f
@@ -91,7 +88,7 @@ MERGE (u)-[r:ESCUCHO {lote:$dataset}]->(c)
 SET r.cantidad=f.count, r.primera_escucha=f.first, r.ultima_escucha=f.last
 \end{lstlisting}
 
-La tabla~\ref{tab:neo4j-carga} resume la carga completa del incremental 2746 en una laptop con macOS. En la laptop de 8~GB donde corrimos el DAG, la misma tarea tardó 261,7~s en la preparación y unos 778~s en la carga (sección~\ref{sec:airflow-corridas}).
+La tabla~\ref{tab:neo4j-carga} resume la carga completa del incremental 2746.
 
 \begin{table}[H]
 \centering
@@ -113,12 +110,11 @@ Carga en Neo4j & 174,90~s \\
 Análisis y publicación & 3,64~s \\
 \bottomrule
 \end{tabular}
-\nota{Ejecución local en macOS del 28 de octubre de 2026. Las sumas de \code{cantidad} en \code{ESCUCHO} y \code{ESCUCHA_ARTISTA} coinciden con las 4\,855\,809 escuchas.}
 \end{table}
 
 \subsection{Operaciones CRUD en Cypher}
 
-\code{python -m databases.neo4j.crud --pause} demuestra las operaciones sobre nodos marcados con la etiqueta \code{ManagedRecord}, para no tocar los datos del lote: crea un usuario y una canción de prueba, crea la relación \code{ESCUCHO} entre ellos, actualiza su propiedad \code{cantidad}, consulta el cambio, elimina la relación y finalmente borra los nodos de prueba con \texttt{DETACH DELETE}.
+\code{python -m databases.neo4j.crud --pause} trabaja sobre nodos \code{ManagedRecord} para no tocar el lote: crea un usuario y una canción de prueba, los une con \code{ESCUCHO}, actualiza \code{cantidad}, consulta el cambio y elimina relación y nodos con \texttt{DETACH DELETE}.
 
 \begin{lstlisting}[language=Cypher]
 MATCH (u:Usuario:ManagedRecord {id:-120012, grupo:$group})
@@ -128,7 +124,7 @@ SET r.cantidad=1
 RETURN type(r) AS relacion, r.cantidad AS cantidad
 \end{lstlisting}
 
-La figura~\ref{fig:neo4j-crud} muestra la demostración sin pausas sobre el grafo completo: al terminar se eliminaron la relación y los dos nodos de prueba, y el lote no cambia.
+La figura~\ref{fig:neo4j-crud} muestra la demostración sobre el grafo completo.
 
 \begin{figure}[H]
 \caption{Demostración del CRUD en Neo4j}
@@ -139,27 +135,27 @@ La figura~\ref{fig:neo4j-crud} muestra la demostración sin pausas sobre el graf
 
 \subsection{Afinidades y comunidades}
 
-El análisis (\code{databases/neo4j/analyze.py}) trabaja sobre los 500 artistas con más oyentes, con al menos 20 oyentes cada uno. Para cada usuario se toman sus 20 artistas más escuchados, y la audiencia $A(a)$ de un artista es el conjunto de usuarios que lo tienen en ese top. La afinidad entre dos artistas es el índice de Jaccard de sus audiencias:
+El análisis (\code{databases/neo4j/analyze.py}) usa los 500 artistas con más oyentes (al menos 20 cada uno). Para cada usuario se toman sus 20 artistas más escuchados y la audiencia $A(a)$ de un artista es el conjunto de usuarios que lo tienen en ese top. La afinidad entre dos artistas es el índice de Jaccard de sus audiencias:
 
 \[
 J(a,b) = \frac{|A(a) \cap A(b)|}{|A(a) \cup A(b)|}
 \]
 
-Se conservan los pares con al menos 10 usuarios en común y $J \geq 0{,}05$, y de ellos los 10 vecinos más afines de cada artista. Sobre ese grafo ponderado se detectan comunidades con el algoritmo de Louvain \citep{blondel2008}, con resolución 1 y semilla fija 42 para que el resultado sea reproducible. El análisis guarda en Neo4j las relaciones \code{AFIN_A}, los nodos \code{Comunidad}, la pertenencia de cada artista y los indicadores, y deja el análisis activo enlazado al lote.
+Se conservan los pares con al menos 10 usuarios en común y $J \geq 0{,}05$, y los 10 vecinos más afines de cada artista. Sobre ese grafo ponderado se detectan comunidades con Louvain \citep{blondel2008} (resolución 1, semilla 42) y se guardan en Neo4j las relaciones \code{AFIN_A}, las comunidades y los indicadores.
 
-Para cada artista se calcula además un coeficiente puente, que mide cómo se reparten sus conexiones entre comunidades. Si $w_{a,c}$ es la suma de los pesos de Jaccard de las aristas de $a$ hacia artistas de la comunidad $c$ y $W_a$ la suma total:
+El coeficiente puente de cada artista mide cómo se reparten sus conexiones entre comunidades. Si $w_{a,c}$ es la suma de los pesos de Jaccard de las aristas de $a$ hacia artistas de la comunidad $c$ y $W_a$ la suma total:
 
 \[
 \text{puente}(a) = 1 - \sum_{c} \left( \frac{w_{a,c}}{W_a} \right)^2
 \]
 
-Vale 0 si todas sus conexiones están en una sola comunidad y crece cuando se reparten entre varias. La diversidad de un usuario es la entropía de Shannon normalizada de sus escuchas repartidas entre comunidades, donde $p_{u,c}$ es la fracción de las escuchas clasificadas del usuario que caen en la comunidad $c$ y $k_u$ el número de comunidades en las que escucha:
+Vale 0 si todas sus conexiones están en una comunidad y crece al repartirse. La diversidad de un usuario es la entropía de Shannon normalizada de sus escuchas entre comunidades, con $p_{u,c}$ la fracción de sus escuchas clasificadas en la comunidad $c$ y $k_u$ el número de comunidades que escucha:
 
 \[
 D(u) = -\frac{\sum_{c} p_{u,c} \ln p_{u,c}}{\ln k_u}
 \]
 
-con $D(u) = 0$ si escucha una sola comunidad. Las tablas~\ref{tab:neo4j-analisis} y~\ref{tab:neo4j-comunidades} resumen el resultado y las comunidades detectadas.
+con $D(u) = 0$ si escucha una sola comunidad. Las tablas~\ref{tab:neo4j-analisis} y~\ref{tab:neo4j-comunidades} resumen el resultado.
 
 \begin{table}[H]
 \centering
@@ -205,20 +201,19 @@ Comunidad & Artistas & Audiencia & Primeros representantes \\
 13 & 4 & 533 & Royal Blood, The Black Keys, Nothing But Thieves \\
 \bottomrule
 \end{tabular}
-\nota{Los representantes son los artistas con mayor grado ponderado dentro de cada comunidad. Las audiencias se solapan, porque un usuario puede escuchar artistas de varias comunidades.}
 \end{table}
 
-Las comunidades agrupan artistas que se reconocen como cercanos (rap estadounidense, metal y rock alternativo, pop, rock clásico, J-pop, solistas de BTS, música electrónica, K-pop), pero los números identifican una partición concreta y no son géneros musicales. Una modularidad alta también puede reflejar los umbrales y la poda de vecinos. Además, solo el 23,76~\% de las escuchas pertenece a artistas con comunidad bajo estos parámetros, lo que limita la interpretación de la diversidad.
+Las comunidades agrupan artistas cercanos (rap estadounidense, metal y rock alternativo, pop, rock clásico, J-pop, solistas de BTS, música electrónica, K-pop); sus números identifican una partición concreta. Los representantes son los artistas con mayor grado ponderado de cada comunidad.
 
 \subsection{Recomendaciones y consultas}
 
-La recomendación de artistas para un usuario suma, para cada artista que todavía no escucha, la afinidad con los artistas que sí escucha ponderada por el peso de cada uno en su historial:
+La recomendación para un usuario suma, por cada artista que aún no escucha, su afinidad con los artistas que sí escucha, ponderada por el peso de cada uno en su historial:
 
 \[
 \text{puntaje}(u, n) = \sum_{k \in K(u)} \text{proporcion}(u,k) \cdot J(k,n)
 \]
 
-donde $K(u)$ son los artistas que escucha $u$. La consulta devuelve también la evidencia de cada recomendación (artista conocido, Jaccard y usuarios en común), así que se puede explicar por qué se recomienda algo:
+donde $K(u)$ son los artistas que escucha $u$. La consulta devuelve también la evidencia (artista conocido y Jaccard):
 
 \begin{lstlisting}[language=Cypher]
 MATCH (l:Lote {id:$dataset, estado:'completo'})-[:ANALISIS_ACTIVO]->(an:Analisis)
@@ -231,8 +226,6 @@ RETURN nuevo.nombre AS artista, puntaje, evidencia
 ORDER BY puntaje DESC LIMIT $limit
 \end{lstlisting}
 
-En un caso del lote, una escucha de Motörhead lleva a recomendar Judas Priest: comparten 17 oyentes, con Jaccard 0,091892 y un puntaje de 0,032819 al ponderarlo por el historial del usuario. La consulta de canciones devuelve \emph{Breaking the Law}, de Judas Priest, y el camino más corto entre ambos artistas en el grafo de afinidad tiene un salto. Radiohead aparece con coeficiente puente 0,634146, lo que describe cómo se reparten sus conexiones entre comunidades; no significa que sea el artista más popular.
+Por ejemplo, una escucha de Motörhead lleva a recomendar Judas Priest: comparten 17 oyentes, con Jaccard 0,091892 y puntaje 0,032819. La consulta de canciones devuelve \emph{Breaking the Law}, y el camino más corto entre ambos artistas tiene un salto. Radiohead aparece con coeficiente puente 0,634146.
 
-\code{python -m databases.neo4j.queries} ejecuta el resto de consultas: artistas con más oyentes, canciones de un artista, filtro de escuchas de un usuario, búsqueda de artistas por texto, totales del lote, recomendación de canciones, comunidades, artistas puente, diversidad de un usuario e indicadores del análisis. La consulta de artistas con más oyentes es la que usa Airflow para el KPI de entidad con más conexiones (sección~\ref{cap:kpis}).
-
-La cobertura de recomendaciones se recalculó con recorridos en Neo4j y coincide con los 16\,372 usuarios obtenidos en Python, y las audiencias de las comunidades también coinciden. Los datos se conservaron después de recrear y reiniciar el contenedor, porque se guardan en un volumen persistente.
+\code{python -m databases.neo4j.queries} ejecuta el resto de consultas: artistas con más oyentes, canciones de un artista, escuchas de un usuario, búsqueda por texto, totales del lote, recomendación de canciones, comunidades, artistas puente, diversidad e indicadores del análisis. La de artistas con más oyentes la usa Airflow para el KPI 5 (sección~\ref{cap:kpis}).

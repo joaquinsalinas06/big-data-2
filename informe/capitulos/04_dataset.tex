@@ -93,7 +93,6 @@ Primera fecha de escucha (UTC) & 2005-02-13 \\
 Última fecha de escucha (UTC) & 2026-10-27 \\
 \bottomrule
 \end{tabular}
-\nota{Exploración local del archivo completo. Los conteos por nombre no equivalen a artistas o canciones únicos.}
 \end{table}
 
 Las cifras describen este incremento, no a la población de ListenBrainz. Los conteos por nombre tampoco equivalen a artistas o canciones únicos: hay homónimos, grafías distintas del mismo artista y registros sin identificador musical. Por eso los 1\,420\,842 \code{recording_msid} distintos no coinciden con las 1\,066\,683 combinaciones de artista y título: son dos criterios de identidad diferentes. El grafo de Neo4j usa el identificador y no fusiona canciones por título.
@@ -121,4 +120,4 @@ Argumento & Por defecto & Uso \\
 \end{tabularx}
 \end{table}
 
-Con el archivo completo la validación no encontró registros inválidos, y la preparación de Neo4j comprobó además que las 4\,855\,809 filas tienen \code{user_id} entero y \code{recording_msid} no vacío. Esta validación es un control de formato, no una auditoría estadística: no prueba que no haya duplicados ni que los eventos sean representativos. La detección de duplicados la hace cada loader al cargar, como se explica en las secciones de cada base.
+Con el archivo completo la validación no encontró registros inválidos, y la preparación de Neo4j comprobó además que las 4\,855\,809 filas tienen \code{user_id} entero y \code{recording_msid} no vacío. La detección de duplicados la hace cada loader al cargar, como se explica en las secciones de cada base.

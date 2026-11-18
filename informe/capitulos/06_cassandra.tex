@@ -5,7 +5,7 @@ Cassandra guarda las escuchas como serie temporal y las métricas agregadas por 
 
 \subsection{Por qué este diseño}
 
-Son 4\,855\,809 escuchas y el DAG puede seguir agregando lotes, así que la base tiene que aceptar escrituras masivas. Las consultas que necesitan los KPIs y el dashboard se conocen de antemano y son siempre las mismas: actividad por día, ranking del mes, evolución de un artista e historial de un usuario. En Cassandra eso se resuelve con una tabla por consulta (diseño \emph{query-first}), de modo que cada lectura va directo a una sola partición sin importar cuántos datos haya. Dentro de la partición, la clave de clustering deja las filas ordenadas por fecha. El costo es repetir datos entre tablas y no poder hacer consultas ad hoc: si aparece una pregunta nueva, hay que agregar otra tabla.
+Son 4\,855\,809 escuchas y el DAG puede seguir agregando lotes, así que la base tiene que aceptar escrituras masivas. Las consultas que necesitan los KPIs y el dashboard se conocen de antemano y son siempre las mismas: actividad por día, ranking del mes, evolución de un artista e historial de un usuario. En Cassandra eso se resuelve con una tabla por consulta (diseño \emph{query-first}), de modo que cada lectura va directo a una sola partición sin importar cuántos datos haya. Dentro de la partición, la clave de clustering deja las filas ordenadas por fecha.
 
 \subsection{Tablas}
 
@@ -66,47 +66,19 @@ En el modelo tomamos tres decisiones que conviene explicar:
 
 \code{listen_id} es un UUID determinista (UUID versión 5) calculado a partir del usuario, el \code{timestamp}, el \code{recording_msid}, el artista y la canción. La misma escucha siempre genera el mismo id, y eso es lo que hace que recargar no duplique filas.
 
-\subsection{Carga por lotes}
+\subsection{Carga por lotes y resultados}
 
-\code{databases/cassandra/loader.py} lee el JSONL en lotes de 500\,000 líneas. Para cada lote:
+\code{databases/cassandra/loader.py} lee el JSONL en lotes de 500\,000 líneas. Para cada lote limpia las líneas (\code{user_id} y \code{timestamp} enteros, artista y canción no vacíos), descarta las escuchas repetidas dentro del lote, escribe las filas en \code{listens_by_user} y registra el lote en \code{load_batches} con un id formado por el nombre del archivo y el rango de líneas (por ejemplo \code{listens_full.jsonl:1-500000}). Al terminar recalcula con todo lo cargado las tablas agregadas (\code{daily_stats}, \code{top_artists_by_month}, \code{artist_monthly_listens} y \code{user_daily_listens}) y las sobrescribe.
 
-\begin{enumerate}
-  \item Limpia cada línea: \code{user_id} y \code{timestamp} enteros, artista y canción no vacíos. Las líneas que no cumplen se cuentan como omitidas, y las escuchas repetidas dentro del lote (mismo \code{listen_id}) se descartan.
-  \item Si el lote no está registrado en \code{load_batches}, escribe sus escuchas en \code{listens_by_user} y lo registra con sus conteos. El id del lote es el nombre del archivo más el rango de líneas, por ejemplo \code{listens_full.jsonl:1-500000}.
-  \item Al terminar, recalcula las tablas agregadas (\code{daily_stats}, \code{top_artists_by_month}, \code{artist_monthly_listens} y \code{user_daily_listens}) con todas las escuchas cargadas hasta ese momento y las sobrescribe.
-\end{enumerate}
-
-Repetir la carga no duplica nada: las escuchas tienen id determinista y el \texttt{INSERT} sobrescribe la misma fila, los lotes registrados no se vuelven a escribir y los agregados se reemplazan en lugar de sumarse. La función \code{load_listens} acepta un máximo de lotes nuevos por ejecución, y eso es lo que usa Airflow para cargar un lote por corrida (sección~\ref{cap:airflow}). El tamaño de lote debe ser siempre el mismo, porque el id de cada lote depende de él.
-
-Hicieron falta tres optimizaciones:
+Repetir la carga no duplica nada: las escuchas tienen id determinista, los lotes registrados no se reescriben y los agregados se reemplazan en lugar de sumarse. \code{load_listens} acepta un máximo de lotes nuevos por ejecución, que Airflow usa para cargar un lote por corrida (sección~\ref{cap:airflow}); el tamaño de lote debe mantenerse, porque el id del lote depende de él. Tres optimizaciones aceleraron la carga:
 
 \begin{itemize}
-  \item \textbf{BATCH por partición.} Las filas de la misma partición se envían juntas en un \texttt{UNLOGGED BATCH} de hasta 30 filas, que Cassandra aplica como una sola mutación. Fue unas 13 veces más rápido que una escritura por fila. Mezclar particiones en un mismo BATCH habría sido más lento.
-  \item \textbf{Sin counters.} La primera versión usaba columnas \code{counter}, pero cada incremento lee antes de escribir, y con alrededor de un millón de claves artista--mes la carga se volvía cada vez más lenta. Además, si un reintento repite un lote, un counter suma dos veces. Recalcular y sobrescribir resultó más rápido y seguro.
-  \item \textbf{\code{UNSET_VALUE} en lugar de \code{None}} para los campos opcionales, porque insertar \code{None} crea un tombstone (marca de borrado) por cada fila.
+  \item Las filas de una misma partición se envían juntas en un \texttt{UNLOGGED BATCH} de hasta 30 filas, unas 13 veces más rápido que una escritura por fila.
+  \item Los agregados se recalculan y sobrescriben en lugar de usar columnas \code{counter}, que leen antes de escribir y suman dos veces si se repite un lote.
+  \item Los campos opcionales usan \code{UNSET_VALUE} en lugar de \code{None}, para no crear un tombstone por fila.
 \end{itemize}
 
-\subsection{Resultados de la carga completa}
-
-Las mediciones se hicieron en una laptop con Windows~11, 20~GB de RAM y Cassandra~5.0 en Docker (un nodo, heap de 2~GB), cargando el archivo completo del incremental 2746 con las tablas vacías. La tabla~\ref{tab:cassandra-tiempos} muestra los tiempos y la tabla~\ref{tab:cassandra-filas}, las filas que quedaron en cada tabla.
-
-\begin{table}[H]
-\centering
-\caption{Tiempos de carga en Cassandra}
-\label{tab:cassandra-tiempos}
-\begin{tabularx}{\textwidth}{l Y}
-\toprule
-Etapa & Tiempo \\
-\midrule
-10 lotes de escuchas (lectura, limpieza y escritura) & 343~s, entre 7\,500 y 21\,600 filas por segundo según el lote \\
-Recálculo de las tablas agregadas & 196~s \\
-Total & 553~s (unos 9 minutos) \\
-Segunda ejecución sin lotes nuevos & 439~s; los totales no cambian (4\,855\,809) \\
-\bottomrule
-\end{tabularx}
-\end{table}
-
-La segunda ejecución demuestra que la carga es idempotente, pero también muestra el costo del diseño: cada ejecución relee el archivo para recalcular los agregados, así que tarda unos 7 minutos aunque no haya lotes nuevos. Para el DAG es aceptable; si hiciera falta bajarlo, habría que recalcular solo los días y meses que tocó el lote nuevo.
+Cargando el archivo completo del incremental 2746 (Cassandra~5.0 en Docker, un nodo con heap de 2~GB, tablas vacías), los 10 lotes tardaron 343~s, entre 7\,500 y 21\,600 filas por segundo, y el recálculo de los agregados 196~s: 553~s en total (unos 9 minutos). Una segunda ejecución sin lotes nuevos dejó los totales intactos (4\,855\,809). La tabla~\ref{tab:cassandra-filas} muestra las filas de cada tabla.
 
 \begin{table}[H]
 \centering
@@ -125,7 +97,7 @@ Tabla & Filas \\
 \end{tabularx}
 \end{table}
 
-El total se comprobó de tres formas independientes: la suma de \code{load_batches}, la suma de \code{daily_stats} y un \texttt{COUNT(*)} partición por partición en \code{listens_by_user}. Las tres dan 4\,855\,809, igual que \code{scripts/validate_dataset.py}, sin líneas omitidas ni duplicadas.
+El total se comprobó de tres formas: la suma de \code{load_batches}, la suma de \code{daily_stats} y un \texttt{COUNT(*)} partición por partición. Las tres dan 4\,855\,809, igual que \code{scripts/validate_dataset.py}.
 
 \subsection{Operaciones CRUD}
 
@@ -148,7 +120,7 @@ Eliminar & \code{delete_listen} & \texttt{DELETE FROM listens\_by\_user} con la 
 \end{tabularx}
 \end{table}
 
-Dos detalles de Cassandra explican el código. Primero, \texttt{INSERT} y \texttt{UPDATE} son \emph{upserts}: un \texttt{UPDATE} sobre una fila que no existe la crea. Por eso \code{update_listen} y \code{delete_listen} leen la fila antes y devuelven \texttt{False} si no existe. Segundo, no usamos \texttt{IF EXISTS}. Lo probamos y fallaba: esas escrituras (transacciones ligeras) usan el reloj del servidor y las normales el del cliente. Con Docker en Windows, el \texttt{UPDATE ... IF EXISTS} respondía que se había aplicado, pero quedaba con un timestamp anterior al del \texttt{INSERT} y Cassandra conservaba el valor viejo.
+En Cassandra \texttt{INSERT} y \texttt{UPDATE} son \emph{upserts}, por lo que \code{update_listen} y \code{delete_listen} leen la fila antes y devuelven \texttt{False} si no existe. No se usa \texttt{IF EXISTS}, porque esas escrituras (transacciones ligeras) usan el reloj del servidor y las normales el del cliente.
 
 La demostración (\code{python -m databases.cassandra.crud --step}) usa el usuario $-1$, que no existe en ListenBrainz: inserta una escucha, la lee, la corrige, la borra y comprueba que ya no está. Termina con una lectura real de las últimas escuchas de un usuario del dataset. El CRUD no modifica las tablas agregadas, que se recalculan en cada carga. La figura~\ref{fig:cassandra-crud} muestra las cuatro operaciones sobre la escucha de prueba, ejecutadas contra el keyspace que dejó Airflow.
 
@@ -178,9 +150,4 @@ Función & Devuelve & Tiempo \\
 \code{get_load_batches} & Lotes cargados, con filas cargadas y omitidas & -- \\
 \bottomrule
 \end{tabularx}
-\nota{Tiempos medidos con el dataset completo: serie diaria de 2026, top 10 de octubre de 2026 e historial mensual de un artista. Leer las últimas 5 escuchas de la partición más grande de \code{listens_by_user} (14\,205 filas) tomó 14~ms.}
 \end{table}
-
-\subsection{Limitaciones}
-
-El keyspace corre en un solo nodo con factor de replicación 1, que sirve para desarrollo pero no tolera caídas; en producción correspondería \code{NetworkTopologyStrategy} con factor 3. Los artistas se identifican por el nombre tal como viene en el dataset, así que homónimos y variantes de escritura cuentan por separado. Los agregados se recalculan desde el archivo, por lo que una escucha creada a mano con el CRUD no aparece en ellos. Por último, los duplicados se descartan dentro de cada lote; entre lotes \code{listens_by_user} no duplica (mismo id), pero los agregados contarían dos veces. En este dataset no hay duplicados: lo comprobamos sobre los 4\,855\,809 registros.

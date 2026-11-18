@@ -1,23 +1,15 @@
 \section{Explicación del DAG de Airflow}
 \label{cap:airflow}
 
-El DAG \code{music_dna_pipeline} automatiza todo el flujo del proyecto: toma el volcado de ListenBrainz, lo valida, lo carga en MongoDB, Cassandra y Neo4j y al final calcula los KPIs \citep{airflow}. Se ejecuta todos los días (\code{@daily}) y en cada corrida agrega un bloque nuevo de escuchas, así se simula que los datos llegan de forma incremental.
-
-El DAG no tiene lógica propia de carga ni de análisis. Cada tarea llama a las funciones que ya están en \code{databases/}, las mismas que se usan por consola, de modo que lo que se probó por separado en cada base es exactamente lo que corre en Airflow. El código está en \code{airflow/dags/music_dna_dag.py}.
+El DAG \code{music_dna_pipeline} automatiza el flujo: toma el volcado de ListenBrainz, lo valida, lo carga en MongoDB, Cassandra y Neo4j y calcula los KPIs \citep{airflow}. Se ejecuta a diario (\code{@daily}) y en cada corrida agrega un bloque nuevo de escuchas, lo que simula la llegada incremental de datos. Cada tarea llama a las funciones de \code{databases/}, las mismas que se usan por consola, de modo que lo probado en cada base es lo que corre en Airflow. El código está en \code{airflow/dags/music_dna_dag.py}.
 
 \subsection{Airflow dentro del stack de Docker}
 
-Airflow se agregó al \code{docker-compose.yml} de la raíz con cuatro servicios: \code{postgres} como base de metadatos (corridas, estados de tareas y XCom), \code{airflow-init}, que corre una sola vez para migrar esa base y crear el usuario administrador, \code{airflow-webserver} con la interfaz en el puerto 8080 y \code{airflow-scheduler}, que programa las corridas y ejecuta las tareas. La configuración común está en un bloque \code{x-airflow-common} para no repetirla en cada servicio.
+Airflow se agregó al \code{docker-compose.yml} de la raíz con cuatro servicios: \code{postgres} (metadatos), \code{airflow-init} (migra la base y crea el usuario administrador), \code{airflow-webserver} (puerto 8080) y \code{airflow-scheduler}. La imagen propia parte de \code{apache/airflow:2.10.5-python3.11} e instala los paquetes del pipeline (pymongo, pydantic, cassandra-driver, neo4j, networkx) con el archivo de constraints oficial. Se usa \code{LocalExecutor}, que ejecuta las tareas en paralelo dentro del contenedor del scheduler.
 
-La imagen propia (\code{airflow/Dockerfile}) parte de \code{apache/airflow:2.10.5-python3.11}. Le agrega \texttt{curl}, \texttt{zstd} y \texttt{tar}, que necesita el script de descarga, y los paquetes del pipeline: pymongo, pydantic, cassandra-driver, neo4j, networkx, python-dotenv y pytz. Se instalan con el archivo de constraints oficial de Airflow para no cambiar las versiones de sus propias dependencias. Streamlit y FastAPI no se instalan porque no corren dentro de Airflow.
-
-Usamos \code{LocalExecutor}: las tareas corren como procesos dentro del contenedor del scheduler y pueden ejecutarse en paralelo. Para una sola máquina alcanza; Celery o Kubernetes harían falta recién con varios nodos de trabajo.
-
-Dentro de los contenedores se montan \code{airflow/dags}, \code{databases}, \code{scripts} y \code{data} en \code{/opt/airflow/}, con \code{PYTHONPATH=/opt/airflow}. Así funcionan los imports \code{databases.mongodb}, \code{databases.cassandra} y \code{databases.neo4j}, y también las rutas de Neo4j, que se calculan desde la raíz del proyecto. Las bases se alcanzan por su nombre de servicio en la red de Docker (\code{mongodb://mongodb:27017/}, \code{CASSANDRA_HOSTS=cassandra}, \code{bolt://neo4j:7687}), no por \code{localhost}. Los servicios de Airflow esperan con \texttt{depends\_on} y \texttt{condition: service\_healthy} a que postgres y las tres bases respondan su healthcheck.
+Los directorios \code{airflow/dags}, \code{databases}, \code{scripts} y \code{data} se montan en \code{/opt/airflow/}, y las bases se alcanzan por su nombre de servicio (\code{mongodb://mongodb:27017/}, \code{cassandra}, \code{bolt://neo4j:7687}). Los servicios de Airflow esperan a que las tres bases pasen su healthcheck.
 
 \subsection{Estructura del DAG}
-
-La tabla~\ref{tab:dag-config} resume la configuración del DAG.
 
 \begin{table}[H]
 \centering
@@ -32,12 +24,11 @@ Programación & \code{@daily}, desde el 1 de noviembre de 2026, con \code{catchu
 Corridas simultáneas & \code{max_active_runs=1} \\
 Reintentos & 2 por tarea, con 5 minutos de espera \\
 Tiempo máximo por tarea & 2 horas \\
-Dataset & \code{/opt/airflow/data/processed/listens_full.jsonl} \\
 \bottomrule
 \end{tabularx}
 \end{table}
 
-\code{catchup=False} evita que al activar el DAG se lancen corridas atrasadas por cada día desde la fecha de inicio. \code{max_active_runs=1} es necesario porque cada corrida continúa donde quedó la anterior: dos corridas a la vez intentarían cargar el mismo bloque. Las seis tareas y sus dependencias se muestran en la figura~\ref{fig:dag}.
+\code{max_active_runs=1} evita que dos corridas intenten cargar el mismo bloque, porque cada una continúa donde quedó la anterior. Las seis tareas, definidas con la API TaskFlow, y sus dependencias se muestran en la figura~\ref{fig:dag}. Cada tarea devuelve un diccionario pequeño (conteos y rutas) que queda como XCom; los datos grandes pasan por el archivo y las bases. Los tamaños de lote son variables de Airflow (\code{music_dna_mongo_limit}, 100\,000 documentos por corrida, y \code{music_dna_cassandra_batch_size}, 500\,000 líneas).
 
 \begin{figure}[H]
 \caption{Tareas del DAG \code{music_dna_pipeline} y sus dependencias}
@@ -60,47 +51,29 @@ Dataset & \code{/opt/airflow/data/processed/listens_full.jsonl} \\
   \draw[flecha] (cas) -- (kpi);
   \draw[flecha] (neo.east) -- (kpi.west);
 \end{tikzpicture}
-\nota{En el código la dependencia se expresa como \code{extraer_datos >> validar_y_limpiar >> [cargar_mongodb, cargar_cassandra, cargar_neo4j] >> generar_kpis}.}
 \end{figure}
 
-En la interfaz de Airflow el DAG se ve como en la figura~\ref{fig:airflow-graph}, con el estado de cada tarea en la corrida seleccionada.
+La figura~\ref{fig:airflow-graph} muestra el DAG en la interfaz de Airflow, con el estado de cada tarea en la segunda corrida.
 
 \begin{figure}[H]
 \caption{Vista \textit{Graph} del DAG en Airflow}
 \label{fig:airflow-graph}
 \centering
 \includegraphics[width=\textwidth]{figuras/airflow_graph.png}
-\nota{Segunda corrida (programada del 14 de noviembre de 2026), con las seis tareas en estado \code{success}.}
 \end{figure}
-
-Las tareas usan la API TaskFlow de Airflow: cada una es una función decorada con \code{@task}, y las dependencias salen de pasar el resultado de una tarea como argumento de la siguiente. Los imports de \code{databases} van dentro de cada tarea para que el scheduler pueda leer el archivo del DAG rápido aunque una base no esté disponible. El final del archivo arma el flujo:
-
-\begin{lstlisting}[language=Python]
-extraccion = extraer_datos()
-validacion = validar_y_limpiar(extraccion)
-generar_kpis(cargar_mongodb(validacion), cargar_cassandra(validacion), cargar_neo4j(validacion))
-\end{lstlisting}
-
-Cada tarea devuelve un diccionario pequeño (conteos, rutas, banderas) que queda como XCom y se puede revisar en la interfaz. Los datos grandes nunca pasan por XCom: las tareas se comunican a través del archivo y de las bases. Los tamaños de lote se configuran como variables de Airflow, desde la interfaz y sin tocar el código (tabla~\ref{tab:dag-variables}).
-
-\begin{table}[H]
-\centering
-\caption{Variables de Airflow del pipeline}
-\label{tab:dag-variables}
-\begin{tabularx}{\textwidth}{l r Y}
-\toprule
-Variable & Por defecto & Uso \\
-\midrule
-\code{music_dna_mongo_limit} & 100000 & Documentos nuevos por corrida en MongoDB \\
-\code{music_dna_mongo_batch_size} & 2000 & Documentos por \code{insert_many} \\
-\code{music_dna_cassandra_batch_size} & 500000 & Líneas por lote de Cassandra; no conviene cambiarlo después de la primera carga \\
-\bottomrule
-\end{tabularx}
-\end{table}
 
 \subsection{Las seis tareas}
 
-La figura~\ref{fig:airflow-grid} muestra las dos corridas en la interfaz. A la izquierda está la grilla, con una columna por corrida y las seis tareas en verde; a la derecha, el diagrama de Gantt de la segunda corrida, donde se ve que las tres cargas arrancan juntas cuando termina la validación y que \code{generar_kpis} espera a la última.
+\begin{description}
+  \item[\code{extraer_datos}] Si el JSONL ya está en \code{data/processed/}, no descarga nada; si no, ejecuta \code{scripts/download_dataset.sh --extract}, que baja el incremental 2746 de MetaBrainz \citep{incremental2746}, verifica su SHA-256 y extrae el archivo.
+  \item[\code{validar_y_limpiar}] Ejecuta \code{scripts/validate_dataset.py}, que comprueba en streaming cada línea y los 4\,855\,809 registros esperados (sección~\ref{cap:dataset}). Si falla, las cargas no se ejecutan. La limpieza registro por registro la hace cada loader, porque cada base exige cosas distintas.
+  \item[\code{cargar_mongodb}] Llama a \code{load_to_mongodb} con \code{limit=100000}; el SQLite de estado guarda el byte donde quedó y las huellas ya insertadas, así que cada corrida sigue donde terminó la anterior.
+  \item[\code{cargar_cassandra}] Crea el esquema (\texttt{IF NOT EXISTS}) y llama a \code{load_listens} con \code{max_batches=1}: carga un lote de 500\,000 líneas, lo registra y recalcula los agregados.
+  \item[\code{cargar_neo4j}] Ejecuta \code{prepare} si hace falta y consulta el nodo \code{Lote}: si está \code{completo} no recarga; si no, ejecuta \code{load_data}.
+  \item[\code{generar_kpis}] Espera a las tres cargas, ejecuta el análisis de comunidades, consulta Cassandra, Neo4j y MongoDB y arma los cinco KPIs (sección~\ref{cap:kpis}). Guarda el snapshot en \code{kpi_runs} y en \code{data/airflow/kpis_latest.json}.
+\end{description}
+
+Las tres cargas dependen solo de la validación y por eso corren en paralelo; si una falla, las otras terminan igual y al reintentar solo se repite la que falló. La figura~\ref{fig:airflow-grid} muestra la grilla de corridas y el diagrama de Gantt de la segunda, y la figura~\ref{fig:airflow-log-kpis} el final del log de \code{generar_kpis}.
 
 \begin{figure}[H]
 \caption{Grilla de corridas y diagrama de Gantt de la segunda corrida}
@@ -109,171 +82,54 @@ La figura~\ref{fig:airflow-grid} muestra las dos corridas en la interfaz. A la i
 \includegraphics[width=\textwidth]{figuras/airflow_grid.png}
 \end{figure}
 
-\subsubsection{\texorpdfstring{\texttt{extraer\_datos}}{extraer\_datos}}
-
-Si el JSONL ya está en \code{data/processed/}, lo reporta y no descarga nada. Si no, ejecuta \code{bash scripts/download_dataset.sh --extract}, que baja el incremental 2746 de MetaBrainz \citep{incremental2746}, verifica el SHA-256 oficial y extrae el archivo de escuchas. Devuelve la ruta, el tamaño y la cantidad de líneas. Va primero porque todas las demás tareas leen ese archivo.
-
-\subsubsection{\texorpdfstring{\texttt{validar\_y\_limpiar}}{validar\_y\_limpiar}}
-
-Ejecuta \code{scripts/validate_dataset.py --file <ruta>}, que recorre el archivo en streaming y comprueba que cada línea sea un objeto JSON con los campos obligatorios y que haya exactamente 4\,855\,809 registros (sección~\ref{cap:dataset}). Si el script termina con error, la tarea falla y las cargas no se ejecutan. Además deja \code{data/airflow/validacion.json} con los registros leídos, válidos e inválidos y el rango de fechas.
-
-Esta tarea es un control de calidad del archivo completo. La limpieza registro por registro la hace cada loader al cargar, porque cada base necesita cosas distintas: MongoDB valida el esquema con Pydantic y descarta duplicados por la huella SHA-256 del documento; Cassandra exige \code{user_id} y \code{timestamp} enteros y artista y canción no vacíos, y descarta duplicados dentro del lote por su id determinista; Neo4j exige además \code{recording_msid}. Repetir esa lógica en Airflow solo duplicaría código.
-
-\subsubsection{\texorpdfstring{\texttt{cargar\_mongodb}}{cargar\_mongodb}}
-
-Llama a \code{load_to_mongodb} con \code{limit=100000}, \code{batch_size=2000} y el estado en \code{data/airflow/mongo_state.sqlite3}. En ese SQLite el loader guarda en qué byte del archivo quedó y las huellas de los documentos ya insertados, así que cada corrida sigue desde donde terminó la anterior y no inserta dos veces el mismo documento.
-
-\subsubsection{\texorpdfstring{\texttt{cargar\_cassandra}}{cargar\_cassandra}}
-
-Primero crea el keyspace y las tablas con \code{create_schema}; como son sentencias \texttt{CREATE ... IF NOT EXISTS}, no pasa nada si ya existen. Después llama a \code{load_listens} con \code{max_batches=1}: carga un lote nuevo de 500\,000 líneas en \code{listens_by_user}, lo registra en \code{load_batches} y recalcula las tablas agregadas con todo lo cargado hasta ese momento. La sesión se cierra siempre, aunque la carga falle:
-
-\begin{lstlisting}[language=Python]
-session = get_session(keyspace=None)
-try:
-    create_schema(session)  # CREATE ... IF NOT EXISTS, se puede repetir
-    session.set_keyspace(KEYSPACE)
-    summary = load_listens(session, DATASET_PATH, batch_size=batch_size, max_batches=1)
-finally:
-    session.cluster.shutdown()
-\end{lstlisting}
-
-\subsubsection{\texorpdfstring{\texttt{cargar\_neo4j}}{cargar\_neo4j}}
-
-Sigue el mismo flujo que la carga por consola de Neo4j. Si no existe \code{data/neo4j/prepared.sqlite}, llama a \code{prepare}. Luego consulta el nodo \code{Lote} del dataset: si su estado es \code{completo}, lo registra en el log y no recarga; si no, ejecuta \code{load_data}. Al final cuenta usuarios, canciones, relaciones y escuchas del lote, y devuelve esos totales.
-
-Las tres cargas dependen solo de la validación y no entre sí, por eso van en paralelo. Si una falla, las otras dos terminan igual, y al reintentar solo se repite la que falló.
-
-\subsubsection{\texorpdfstring{\texttt{generar\_kpis}}{generar\_kpis}}
-
-Espera a las tres cargas. Ejecuta el análisis de afinidades y comunidades de Neo4j, que guarda su resultado en el grafo y en \code{data/neo4j/analysis.json}. Luego consulta Cassandra con \code{get_daily_stats}, \code{get_top_artists} y \code{get_load_batches}, busca en Neo4j el artista con más oyentes y cuenta los documentos de MongoDB. Con eso arma los cinco KPIs (sección~\ref{cap:kpis}) y guarda un snapshot con el identificador de la corrida y la fecha en la colección \code{kpi_runs} de MongoDB y en \code{data/airflow/kpis_latest.json}. La figura~\ref{fig:airflow-log-kpis} muestra el final de su log en la segunda corrida, con los cinco valores.
-
 \begin{figure}[H]
 \caption{Log de \code{generar_kpis} en la segunda corrida}
 \label{fig:airflow-log-kpis}
 \centering
 \includegraphics[width=0.9\textwidth]{figuras/airflow_log_kpis.png}
-\nota{Las líneas anteriores corresponden al análisis de comunidades de Neo4j (13 comunidades y 1\,553 afinidades) y a la conexión con Cassandra.}
 \end{figure}
 
-\subsection{Carga incremental simulada}
+\subsection{Carga incremental, idempotencia y reintentos}
 
-El dataset es un solo archivo, así que la llegada de datos nuevos se simula cargando una parte en cada corrida, como muestra la tabla~\ref{tab:dag-incremental}.
-
-\begin{table}[H]
-\centering
-\caption{Lo que agrega cada corrida del DAG}
-\label{tab:dag-incremental}
-\begin{tabularx}{\textwidth}{l Y Y}
-\toprule
-Base & Qué agrega cada corrida & Corridas para cubrir el archivo \\
-\midrule
-MongoDB & 100\,000 documentos nuevos, desde el byte donde quedó la anterior & 40, por el tope de 4\,000\,000 documentos del loader \\
-Cassandra & 1 lote de 500\,000 líneas y recálculo de agregados & 10 \\
-Neo4j & Nada después de la primera carga completa & 1 \\
-\bottomrule
-\end{tabularx}
-\end{table}
-
-Para que MongoDB fuera incremental hubo que corregir \code{load_to_mongodb}, como se explica en la sección~\ref{cap:mongodb}: el total objetivo pasó a ser lo que ya hay en la colección más \code{limit}. En Cassandra el id de cada lote es \code{listens_full.jsonl:<inicio>-<fin>}, donde \code{inicio} y \code{fin} son la primera y la última línea del lote; por eso el tamaño de lote tiene que ser siempre el mismo; si cambiara, los ids no coincidirían con los ya registrados y los agregados contarían dos veces.
-
-La figura~\ref{fig:airflow-xcom} muestra el XCom que devuelve \code{cargar_mongodb} en las dos corridas: cada una inserta 100\,000 documentos sin duplicados, el total de la colección pasa de 100\,000 a 200\,000 y la posición en el archivo avanza de 72\,369\,600 a 114\,091\,801 bytes.
+Como el dataset es un solo archivo, la llegada de datos nuevos se simula cargando una parte en cada corrida: MongoDB agrega 100\,000 documentos desde el byte donde quedó (40 corridas cubren el tope de 4\,000\,000), Cassandra agrega un lote de 500\,000 líneas (10 corridas cubren el archivo) y Neo4j se carga completo en la primera corrida. En Cassandra el id de cada lote es \code{listens_full.jsonl:<inicio>-<fin>}, por lo que el tamaño de lote se mantiene fijo. La figura~\ref{fig:airflow-xcom} muestra el XCom de \code{cargar_mongodb}: cada corrida inserta 100\,000 documentos, la colección pasa de 100\,000 a 200\,000 y la posición avanza de 72\,369\,600 a 114\,091\,801 bytes.
 
 \begin{figure}[H]
 \caption{XCom de \code{cargar_mongodb} en las dos corridas}
 \label{fig:airflow-xcom}
 \centering
 \includegraphics[width=\textwidth]{figuras/airflow_xcom.png}
-\nota{La fila de abajo es la primera corrida (manual) y la de arriba la segunda (programada).}
 \end{figure}
 
-Como los KPIs se recalculan en cada corrida con lo que hay en las bases, cambian a medida que crece Cassandra. Cuando se terminan los lotes, las corridas siguen funcionando, pero los valores se estabilizan.
+Neo4j se carga una sola vez porque sus relaciones guardan la cantidad total de cada par usuario--canción y usuario--artista y la proporción de cada artista en el historial, valores que se calculan sobre todo el lote, y porque las afinidades y comunidades necesitan el grafo completo. Después de la primera corrida la tarea solo comprueba que el lote esté \code{completo}.
 
-\subsection{Por qué Neo4j se carga una sola vez}
-
-El loader de Neo4j no está pensado para cargar por partes. \code{prepare} exige el archivo completo (falla si no tiene 4\,855\,809 filas) y guarda el SHA-256 del archivo en el nodo \code{Lote}. Las relaciones \code{ESCUCHO} y \code{ESCUCHA_ARTISTA} guardan la cantidad total de escuchas de cada par usuario--canción y usuario--artista, y la proporción de cada artista en el historial del usuario. Esos valores se calculan sobre todo el lote: cargar por partes obligaría a sumar sobre lo ya cargado y recalcular las proporciones, es decir, escribir otro loader.
-
-Además el grafo responde preguntas de relaciones (afinidades, comunidades, recomendaciones) que no ganan nada con ver el lote a medias. Por eso la tarea carga el grafo completo la primera vez y en las siguientes solo comprueba que el lote esté completo. Como la carga usa \texttt{MERGE}, aunque se repitiera no duplicaría nodos ni relaciones.
-
-\subsection{Idempotencia y reintentos}
-
-Cada tarea se puede repetir sin dejar datos duplicados, y eso es lo que hace seguros los dos reintentos automáticos. La tabla~\ref{tab:dag-idempotencia} detalla qué pasa con cada una.
-
-\begin{table}[H]
-\centering
-\caption{Comportamiento de cada tarea al repetirse}
-\label{tab:dag-idempotencia}
-\begin{tabularx}{\textwidth}{l Y}
-\toprule
-Tarea & Qué pasa si se repite \\
-\midrule
-\code{extraer_datos} & Si el archivo ya está, no descarga. La extracción escribe a un \code{.part} y lo renombra al final, nunca deja un archivo a medias \\
-\code{validar_y_limpiar} & Solo lee el archivo y sobrescribe el reporte \\
-\code{cargar_mongodb} & Sigue desde el último checkpoint; los documentos tienen un \code{_id} derivado de su huella, así que un reintento no los duplica \\
-\code{cargar_cassandra} & Los lotes registrados en \code{load_batches} se saltan, las escuchas tienen id determinista y los agregados se reemplazan, no se suman \\
-\code{cargar_neo4j} & Si el lote está completo, no hace nada; si quedó en estado \code{cargando}, \code{load_data} vuelve a correr con \texttt{MERGE} \\
-\code{generar_kpis} & El análisis borra y vuelve a crear sus propias afinidades y comunidades; el snapshot se guarda con \code{replace_one} usando el identificador de la corrida como \code{_id} \\
-\bottomrule
-\end{tabularx}
-\end{table}
-
-Si una corrida de MongoDB falla en medio de un lote, el checkpoint queda en el último lote confirmado y las huellas se reconstruyen leyendo la colección al empezar, así que lo que alcanzó a insertarse no se vuelve a insertar.
+Cada tarea se puede repetir sin duplicar datos, lo que hace seguros los reintentos automáticos: \code{extraer_datos} no descarga si el archivo existe y escribe a un \code{.part} que renombra al final; \code{validar_y_limpiar} solo lee; MongoDB retoma el checkpoint y sus \code{_id} derivan de la huella; Cassandra salta los lotes registrados, usa ids deterministas y reemplaza los agregados; Neo4j no hace nada si el lote está completo y, si quedó \code{cargando}, repite \code{load_data} con \texttt{MERGE}; y \code{generar_kpis} recrea sus afinidades y guarda el snapshot con \code{replace_one} usando el \code{run_id} como \code{_id}.
 
 \subsection{Cómo se ejecuta}
 
-Con el stack levantado (\texttt{docker compose build} y \texttt{docker compose up -d}), la interfaz de Airflow queda en \url{http://localhost:8080}. El DAG aparece pausado: se activa con el interruptor y se lanza con el botón de ejecución, o se deja que el scheduler lo dispare una vez al día. También se puede correr completo desde la terminal:
-
-\begin{lstlisting}[language=bash]
-docker compose exec airflow-scheduler airflow dags list-import-errors
-docker compose exec airflow-scheduler airflow dags test music_dna_pipeline
-\end{lstlisting}
-
-Si el dataset no está en \code{data/processed/}, la primera tarea lo descarga. El resultado queda en \code{data/airflow/kpis_latest.json} y en la colección \code{kpi_runs}.
+Con el stack levantado (\texttt{docker compose up -d}), la interfaz queda en \url{http://localhost:8080}. El DAG se activa con el interruptor y se lanza con el botón de ejecución, o lo dispara el scheduler una vez al día; también puede correr completo con \code{airflow dags test music_dna_pipeline}. El resultado queda en \code{data/airflow/kpis_latest.json} y en la colección \code{kpi_runs}.
 
 \subsection{Corridas medidas}
 \label{sec:airflow-corridas}
 
-Probamos el pipeline completo dos veces seguidas, con las tres bases vacías al empezar. La laptop tenía Ubuntu 22.04, 4 núcleos y 8~GB de RAM, menos de los 10~GB que pide el compose, así que con un \code{docker-compose.override.yml} local (no versionado) bajamos el heap de Cassandra a 1~GB, el de Neo4j a 1~GB con 512~MB de page cache y la caché de MongoDB a 0,5~GB. La primera corrida se lanzó desde la terminal con \texttt{airflow dags test}, que ejecuta las tareas una tras otra en un solo proceso. La segunda se lanzó desde la interfaz, activando el DAG: el scheduler creó la corrida programada del 14 de noviembre y la ejecutó con \code{LocalExecutor}, con las tres cargas en paralelo. La tabla~\ref{tab:airflow-tiempos} muestra la duración de cada tarea.
+Se ejecutó el pipeline dos veces seguidas con las bases vacías: la primera con \texttt{airflow dags test} (tareas en serie) y la segunda programada desde la interfaz (cargas en paralelo). La tabla~\ref{tab:airflow-tiempos} resume duraciones y estado de las bases.
 
 \begin{table}[H]
 \centering
-\caption{Duración de cada tarea en las dos corridas}
+\caption{Duración de las tareas y estado de las bases en las dos corridas}
 \label{tab:airflow-tiempos}
-\begin{tabular}{l r r}
+\begin{tabularx}{\textwidth}{l r r}
 \toprule
-Tarea & Corrida 1 (s) & Corrida 2 (s) \\
+ & Corrida 1 & Corrida 2 \\
 \midrule
-\code{extraer_datos} & 6,3 & 6,3 \\
-\code{validar_y_limpiar} & 103,5 & 57,2 \\
-\code{cargar_mongodb} & 40,9 & 38,9 \\
-\code{cargar_cassandra} & 107,6 & 96,6 \\
-\code{cargar_neo4j} & 1\,039,4 & 9,6 \\
-\code{generar_kpis} & 28,8 & 11,5 \\
-\midrule
-Corrida completa & 1\,326,8 & 176 \\
-\bottomrule
-\end{tabular}
-\nota{En la corrida 1 las tareas corren en serie y el total es la suma. En la corrida 2 las tres cargas van en paralelo y el total es la duración que reporta Airflow (2 minutos y 56 segundos).}
-\end{table}
-
-La primera corrida tarda 22 minutos y casi todo es la carga de Neo4j: 261,7~s de preparación en SQLite y el resto, unos 778~s, de escritura y reconciliación en el grafo. El tiempo de esa tarea varía bastante en esta laptop según la memoria libre; en otra carga completa anterior tardó 569~s. En la segunda corrida Neo4j solo consulta el nodo \code{Lote} y cuenta los totales, y la corrida completa baja a menos de 3 minutos. MongoDB y Cassandra tardan parecido en las dos corridas porque cada una agrega el mismo volumen: 100\,000 documentos y un lote de 500\,000 escuchas. La tabla~\ref{tab:airflow-conteos} resume el estado de las bases después de cada corrida.
-
-\begin{table}[H]
-\centering
-\caption{Estado de las bases después de cada corrida}
-\label{tab:airflow-conteos}
-\begin{tabularx}{\textwidth}{l Y Y}
-\toprule
-Medida & Después de la corrida 1 & Después de la corrida 2 \\
-\midrule
-Documentos en \code{listens} (MongoDB) & 100\,000 & 200\,000 \\
-Snapshots en \code{kpi_runs} (MongoDB) & 1 & 2 \\
-Lotes en \code{load_batches} (Cassandra) & 1 (500\,000 escuchas) & 2 (1\,000\,000 escuchas) \\
-Usuarios y canciones (Neo4j) & 26\,394 y 1\,420\,842 & 26\,394 y 1\,420\,842 \\
-Relaciones \code{ESCUCHO} y escuchas (Neo4j) & 1\,791\,408 y 4\,855\,809 & 1\,791\,408 y 4\,855\,809 \\
+\code{cargar_mongodb} & 40,9~s & 38,9~s \\
+\code{cargar_cassandra} & 107,6~s & 96,6~s \\
+\code{cargar_neo4j} & 1\,039,4~s & 9,6~s \\
+Corrida completa & 1\,326,8~s & 176~s \\
+Documentos en MongoDB & 100\,000 & 200\,000 \\
+Escuchas en Cassandra & 500\,000 & 1\,000\,000 \\
+Escuchas en Neo4j & 4\,855\,809 & 4\,855\,809 \\
 \bottomrule
 \end{tabularx}
 \end{table}
 
-Los conteos confirman que la carga es incremental: MongoDB y Cassandra crecen un bloque por corrida y Neo4j no duplica nada. En la segunda corrida el log de \code{cargar_neo4j} registra que el lote \code{listenbrainz-2746} ya está completo y no se vuelve a cargar.
-
-La memoria fue el límite de esta laptop. En la segunda corrida la memoria disponible bajó como mínimo a 875~MB y las seis tareas terminaron al primer intento. En una prueba anterior, con el navegador abierto y el swap casi lleno, \code{cargar_cassandra} falló dos veces: la primera, en paralelo con la carga de MongoDB, con \code{WriteTimeout}, y la segunda, ya sin otras cargas, porque el driver encontró la conexión saturada. El tercer intento automático terminó bien y, como el lote no se registra hasta que termina, no quedaron filas duplicadas. Por eso dejamos las cargas en paralelo: con la memoria libre la corrida termina sin reintentos, y si Cassandra no alcanza a responder, los reintentos repiten el lote sin efectos secundarios.
+La primera corrida tarda 22 minutos, casi todo en la carga de Neo4j; en la segunda esa tarea solo consulta el lote y la corrida completa baja a menos de 3 minutos. MongoDB y Cassandra tardan parecido en ambas porque cada una agrega el mismo volumen. Los conteos confirman la carga incremental: MongoDB y Cassandra crecen un bloque por corrida y Neo4j no duplica nada.

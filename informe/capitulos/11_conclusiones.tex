@@ -29,3 +29,7 @@ Integrar módulos hechos por separado sacó a la luz errores que no se veían en
 \subsection{Trabajo futuro}
 
 El paso natural es que \code{extraer_datos} descargue el siguiente incremental publicado por ListenBrainz en lugar de recorrer siempre el mismo archivo, y que Neo4j tenga un loader que sume sobre lo ya cargado y recalcule las proporciones de los usuarios afectados. En Cassandra convendría recalcular solo los días y meses que toca cada lote nuevo, y pasar a un clúster de tres nodos con \code{NetworkTopologyStrategy}. Por último, normalizar los artistas con los identificadores de MusicBrainz resolvería el problema de los homónimos en las tres bases.
+
+\subsection{Repositorio y video}
+
+El código fuente completo (loaders, scripts de creación de las bases, DAG de Airflow y dashboard) está en el repositorio \repolink. El video demostrativo (carpeta de Google Drive) está disponible en \videolink.
